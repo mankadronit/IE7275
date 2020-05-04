@@ -1,0 +1,1 @@
+This Repo contains my assignments and projects for IE7275 - Data Mining in Engineering course.
