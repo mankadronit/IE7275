@@ -22,14 +22,17 @@ through December combined in one graph. Hint: Place area on Y axis and use
 2x2 matrix to place the plots adjacent to each other.
 
 ``` {r}
+# Import the Dataframe
 forestfires <- data.frame(read.csv("./data/forestfires.csv"), stringsAsFactors = FALSE)
 
+# Convert the month column into factors and sort from Jan-Dec
 forestfires$month <- factor(forestfires$month, 
                             levels = c("jan", "feb", "mar", 
                                        "apr", "may", "jun", 
                                        "jul", "aug", "sep", 
                                        "oct", "nov", "dec"))
 
+# Create 4 scatter plots
 p1 <- ggplot(forestfires, aes(temp, area)) + geom_point(color="#d63447") +
       ggtitle("Temp vs Area") +
       theme_classic()
@@ -45,10 +48,27 @@ p4 <- ggplot(forestfires, aes(RH, area)) + geom_point(color="#d63447") +
       ggtitle("RH vs Area") +
       theme_classic()
       
-
+# Arrange plots P1-P4 into a 2x2 grid
 fig <- ggarrange(p1, p2, p3, p4,
-                 
                  ncol=2, nrow=2)
 
-fig
+plot(fig)
+
+rm(list=c("p1", "p2", "p3", "p4", "fig"))
+```
+
+(b) Plot the histogram of wind speed (km/h).
+
+``` {r}
+# Create the Wind-Historgram
+wind_hist <- ggplot(forestfires, aes(wind)) +
+             geom_histogram(bins=10, fill="#08d9d6", color="black") +
+             theme_classic() +
+             ggtitle("Histogram of Wind Speed") +
+             labs(x="Wind Speed (km/hour)")
+
+# Plot 
+plot(wind_hist)
+
+rm(wind_hist)
 ```
