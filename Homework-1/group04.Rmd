@@ -2,13 +2,45 @@
 title: 'Homework #1'
 author: "Group 4"
 date: "5/10/2020"
-output: pdf_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# First, let's import the required libraries
+``` {r}
+library(ggplot2)
+library(ggpubr)
+library(dplyr)
+library(RColorBrewer)
 ```
 
-``` {r}
+## Problem 1
 
+(a) Plot area vs.temp, area vs. month, area vs. DC, area vs. RH for January
+through December combined in one graph. Hint: Place area on Y axis and use
+2x2 matrix to place the plots adjacent to each other.
+
+``` {r}
+forestfires <- data.frame(read.csv("./data/forestfires.csv"), stringsAsFactors = FALSE)
+
+forestfires$month <- factor(forestfires$month, 
+                            levels = c("jan", "feb", "mar", 
+                                       "apr", "may", "jun", 
+                                       "jul", "aug", "sep", 
+                                       "oct", "nov", "dec"))
+p1 <- ggplot(forestfires, aes(temp, area)) + geom_point(color="#d63447") +
+      ggtitle("Temp vs Area")
+p2 <- ggplot(forestfires, aes(month, area, color=month)) + geom_point() +
+      scale_color_brewer(palette = "Set2") +
+      theme(legend.position = "none") +
+      ggtitle("Month vs Area")
+p3 <- ggplot(forestfires, aes(DC, area)) + geom_point(color="#d63447") +
+      ggtitle("DC vs Area")
+p4 <- ggplot(forestfires, aes(RH, area)) + geom_point(color="#d63447") +
+      ggtitle("RH vs Area")
+
+fig <- ggarrange(p1, p2, p3, p4, 
+                 ncol=2, nrow=2)
+fig
 ```
