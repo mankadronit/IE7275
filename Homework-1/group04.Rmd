@@ -29,18 +29,26 @@ forestfires$month <- factor(forestfires$month,
                                        "apr", "may", "jun", 
                                        "jul", "aug", "sep", 
                                        "oct", "nov", "dec"))
+
 p1 <- ggplot(forestfires, aes(temp, area)) + geom_point(color="#d63447") +
-      ggtitle("Temp vs Area")
+      ggtitle("Temp vs Area") +
+      theme_classic()
 p2 <- ggplot(forestfires, aes(month, area, color=month)) + geom_point() +
-      scale_color_brewer(palette = "Set2") +
+      scale_color_brewer(palette = "Set3") +
+      theme_classic() +
       theme(legend.position = "none") +
       ggtitle("Month vs Area")
 p3 <- ggplot(forestfires, aes(DC, area)) + geom_point(color="#d63447") +
-      ggtitle("DC vs Area")
+      ggtitle("DC vs Area") +
+      theme_classic()
 p4 <- ggplot(forestfires, aes(RH, area)) + geom_point(color="#d63447") +
-      ggtitle("RH vs Area")
+      ggtitle("RH vs Area") +
+      theme_classic()
+      
 
-fig <- ggarrange(p1, p2, p3, p4, 
+fig <- ggarrange(p1, p2, p3, p4,
+                 
                  ncol=2, nrow=2)
+
 fig
 ```
