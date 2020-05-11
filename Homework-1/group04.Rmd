@@ -72,3 +72,34 @@ plot(wind_hist)
 
 rm(wind_hist)
 ```
+
+(c) Compute the summery statistics (min, 1Q, mean, median, 3Q, max,) of part b.
+
+``` {r}
+quantiles <- quantile(forestfires$wind)
+
+cat("Minimum Wind Speed is :", quantiles[[1]], "\n")
+cat("1st Quantile of Wind Speed is :", quantiles[[2]], "\n")
+cat("Mean Wind Speed is :", mean(forestfires$wind), "\n")
+cat("Median Wind Speed is :", quantiles[[3]], "\n")
+cat("3rd Quartile of Wind Speed is :", quantiles[[4]], "\n")
+cat("Maximum Wind Speed is :", quantiles[[5]], "\n")
+
+```
+
+(d) Add a density line to the histogram in part b.
+
+``` {r}
+wind_hist_plus_density <- ggplot(forestfires, aes(x=wind, y=..density..)) +   
+                          geom_histogram(bins=10, colour="black", fill="#08d9d6") + 
+                          geom_density(aes(y=..density..), color="black") +
+                          ylab("Density") + 
+                          xlab("Wind Speed (km/hour)") + 
+                          ggtitle("Histogram of Wind Speed") +
+                          theme_bw()
+
+plot(wind_hist_plus_density)
+
+rm(wind_hist_plus_density)
+
+```
