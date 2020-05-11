@@ -23,38 +23,47 @@ through December combined in one graph. Hint: Place area on Y axis and use
 
 ``` {r}
 # Import the Dataframe
-forestfires <- data.frame(read.csv("./data/forestfires.csv"), stringsAsFactors = FALSE)
+forestfires <- data.frame(read.csv("./data/forestfires.csv"),
+  stringsAsFactors = FALSE
+)
 
 # Convert the month column into factors and sort from Jan-Dec
-forestfires$month <- factor(forestfires$month, 
-                            levels = c("jan", "feb", "mar", 
-                                       "apr", "may", "jun", 
-                                       "jul", "aug", "sep", 
-                                       "oct", "nov", "dec"))
+forestfires$month <- factor(forestfires$month,
+  levels = c(
+    "jan", "feb", "mar",
+    "apr", "may", "jun",
+    "jul", "aug", "sep",
+    "oct", "nov", "dec"
+  )
+)
 
 # Create 4 scatter plots
-p1 <- ggplot(forestfires, aes(temp, area)) + geom_point(color="#d63447") +
-      ggtitle("Temp vs Area") +
-      theme_classic()
-p2 <- ggplot(forestfires, aes(month, area, color=month)) + geom_point() +
-      scale_color_brewer(palette = "Set3") +
-      theme_classic() +
-      theme(legend.position = "none") +
-      ggtitle("Month vs Area")
-p3 <- ggplot(forestfires, aes(DC, area)) + geom_point(color="#d63447") +
-      ggtitle("DC vs Area") +
-      theme_classic()
-p4 <- ggplot(forestfires, aes(RH, area)) + geom_point(color="#d63447") +
-      ggtitle("RH vs Area") +
-      theme_classic()
-      
+p1 <- ggplot(forestfires, aes(temp, area)) +
+  geom_point(color = "#d63447", alpha = 0.5) +
+  ggtitle("Temp vs Area") +
+  theme_classic()
+p2 <- ggplot(forestfires, aes(month, area, color = month)) +
+  geom_point() +
+  scale_color_brewer(palette = "Set3") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  ggtitle("Month vs Area")
+p3 <- ggplot(forestfires, aes(DC, area)) +
+  geom_point(color = "#d63447", alpha = 0.5) +
+  ggtitle("DC vs Area") +
+  theme_classic()
+p4 <- ggplot(forestfires, aes(RH, area)) +
+  geom_point(color = "#d63447", alpha = 0.5) +
+  ggtitle("RH vs Area") +
+  theme_classic()
+
 # Arrange plots P1-P4 into a 2x2 grid
-fig <- ggarrange(p1, p2, p3, p4,
-                 ncol=2, nrow=2)
+fig <- ggarrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
+
 
 plot(fig)
 
-rm(list=c("p1", "p2", "p3", "p4", "fig"))
+rm(list = c("p1", "p2", "p3", "p4", "fig"))
 ```
 
 (b) Plot the histogram of wind speed (km/h).
@@ -62,12 +71,12 @@ rm(list=c("p1", "p2", "p3", "p4", "fig"))
 ``` {r}
 # Create the Wind-Historgram
 wind_hist <- ggplot(forestfires, aes(wind)) +
-             geom_histogram(bins=10, fill="#08d9d6", color="black") +
-             theme_classic() +
-             ggtitle("Histogram of Wind Speed") +
-             labs(x="Wind Speed (km/hour)")
+  geom_histogram(bins = 10, fill = "#08d9d6", color = "black") +
+  theme_classic() +
+  ggtitle("Histogram of Wind Speed") +
+  labs(x = "Wind Speed (km/hour)")
 
-# Plot 
+# Plot
 plot(wind_hist)
 
 rm(wind_hist)
@@ -76,8 +85,10 @@ rm(wind_hist)
 (c) Compute the summery statistics (min, 1Q, mean, median, 3Q, max,) of part b.
 
 ``` {r}
+# Calculate the Quantiles
 quantiles <- quantile(forestfires$wind)
 
+# Print
 cat("Minimum Wind Speed is :", quantiles[[1]], "\n")
 cat("1st Quantile of Wind Speed is :", quantiles[[2]], "\n")
 cat("Mean Wind Speed is :", mean(forestfires$wind), "\n")
@@ -85,21 +96,46 @@ cat("Median Wind Speed is :", quantiles[[3]], "\n")
 cat("3rd Quartile of Wind Speed is :", quantiles[[4]], "\n")
 cat("Maximum Wind Speed is :", quantiles[[5]], "\n")
 
+rm(quantiles)
 ```
 
 (d) Add a density line to the histogram in part b.
 
 ``` {r}
-wind_hist_plus_density <- ggplot(forestfires, aes(x=wind, y=..density..)) +   
-                          geom_histogram(bins=10, colour="black", fill="#08d9d6") + 
-                          geom_density(aes(y=..density..), color="black") +
-                          ylab("Density") + 
-                          xlab("Wind Speed (km/hour)") + 
-                          ggtitle("Histogram of Wind Speed") +
-                          theme_bw()
+# Create the Histogram and Density Plot
+wind_hist_plus_density <- ggplot(forestfires, aes(x = wind, y = ..density..)) +
+  geom_histogram(bins = 10, colour = "black", fill = "#08d9d6") +
+  geom_density(aes(y = ..density..), color = "black") +
+  ylab("Density") +
+  xlab("Wind Speed (km/hour)") +
+  ggtitle("Histogram of Wind Speed") +
+  theme_bw()
 
 plot(wind_hist_plus_density)
 
 rm(wind_hist_plus_density)
+```
 
+(e) Plot the wind speed density function of all months in one plot. Use
+different colors for different months in the graph to interpret your result clearly.
+[Hint: use ggplot + geom_density or qplot(geom=density)]
+
+``` {r warning = FALSE}
+# Create month wise density plot
+month_density_plot <- ggplot(forestfires, aes(
+  x = wind,
+  y = ..density..,
+  fill = month
+)) +
+  geom_density(alpha = 0.8) +
+  scale_fill_brewer(palette = "Set3") +
+  theme_classic() +
+  ggtitle("Wind Speed Density Plots for each month") +
+  labs(x = "Wind Speed (km/hour)", y = "Density", fill = "Month") +
+  scale_x_continuous(expand = c(0, 0), limits = c(0, NA)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, NA))
+
+plot(month_density_plot)
+
+rm(month_density_plot)
 ```
