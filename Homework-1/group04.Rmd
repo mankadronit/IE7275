@@ -8,10 +8,12 @@ output:
 ---
 
 # First, let's import the required libraries
-``` {r}
+``` {r echo = FALSE}
 library(ggplot2)
+library(GGally)
 library(ggpubr)
 library(dplyr)
+library(reshape2)
 library(RColorBrewer)
 ```
 
@@ -139,3 +141,82 @@ plot(month_density_plot)
 
 rm(month_density_plot)
 ```
+
+(f) Plot the scatter matrix for temp, RH, DC and DMC. How would you interpret the
+result in terms of correlation among these data?
+
+``` {r}
+# Plot ScatterMatrix
+ggpairs(forestfires, 
+        title = "Scatterplot Matrix",
+        columns = c("temp", "RH", "DC", "DMC"))
+```
+
+Looking at the Scatter Matrix, we can make the following conclusions -
+(1) Temp and RH are negatively correlated with corr. coeff of -0.527.
+(2) Temp and DC are positively correlated with corr. coeff of 0.496.
+(3) Temp and DC are positively correlated with corr. coeff of 0.47.
+(4) RH has no correlation with DC and DMS whatsoever.
+(5) DC and DMC are very strongly correlated with a corr. coeff of 0.682.
+
+---
+
+(g) Create boxplot for wind, ISI and DC. Are there any anomalies/outliers? Interpret
+your result. 
+
+``` {r, warning = FALSE}
+
+# Create a temporary dataframe and reshape it
+df <- forestfires %>% select(wind, ISI, DC)
+suppressMessages({
+  df <- melt(df)
+})
+
+# Plot 3 boxplots for Wind, ISI, and DC
+ggplot(df %>% filter(variable == "wind"), aes(x=variable, y=value, fill=variable)) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(legend.position = "none",
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank()) +
+  ggtitle("Wind Speed Box Plot") +
+  labs(x = "Wind Speed", y = "Value")
+
+ggplot(df %>% filter(variable == "ISI"), aes(x=variable, y=value, fill=variable)) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(legend.position = "none",
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank()) +
+  ggtitle("ISI Box Plot") +
+  labs(x = "ISI", y = "Value")
+
+ggplot(df %>% filter(variable == "DC"), aes(x=variable, y=value, fill=variable)) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(legend.position = "none", 
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank()) +
+  ggtitle("DC Box Plot") +
+  labs(x = "DC", y = "Value")
+
+
+rm(df)
+```
+
+We can make the following observations, 
+(1) Wind has only 3 outliers, the rest of the values are between 0.4 - 7.5 approximately.
+(2) ISI has quite a few outliers exceeding the value 18. The biggest outlier is of a value
+    56.1
+(3) DC has only 2 outliers which are below the value 15.
+
+---
+
+(h) Create the histogram of DMC. Create the histogram of log of DMC. Compare the
+result and explain your answer.
+
+``` {r}
+
+```
+
+---
