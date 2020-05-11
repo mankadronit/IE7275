@@ -147,9 +147,10 @@ result in terms of correlation among these data?
 
 ``` {r}
 # Plot ScatterMatrix
-ggpairs(forestfires, 
-        title = "Scatterplot Matrix",
-        columns = c("temp", "RH", "DC", "DMC"))
+ggpairs(forestfires,
+  title = "Scatterplot Matrix",
+  columns = c("temp", "RH", "DC", "DMC")
+)
 ```
 
 Looking at the Scatter Matrix, we can make the following conclusions -
@@ -173,30 +174,36 @@ suppressMessages({
 })
 
 # Plot 3 boxplots for Wind, ISI, and DC
-ggplot(df %>% filter(variable == "wind"), aes(x=variable, y=value, fill=variable)) +
+ggplot(df %>% filter(variable == "wind"), aes(x = variable, y = value, fill = variable)) +
   geom_boxplot() +
   theme_classic() +
-  theme(legend.position = "none",
-        axis.ticks.x = element_blank(),
-        axis.text.x = element_blank()) +
+  theme(
+    legend.position = "none",
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_blank()
+  ) +
   ggtitle("Wind Speed Box Plot") +
   labs(x = "Wind Speed", y = "Value")
 
-ggplot(df %>% filter(variable == "ISI"), aes(x=variable, y=value, fill=variable)) +
+ggplot(df %>% filter(variable == "ISI"), aes(x = variable, y = value, fill = variable)) +
   geom_boxplot() +
   theme_classic() +
-  theme(legend.position = "none",
-        axis.ticks.x = element_blank(),
-        axis.text.x = element_blank()) +
+  theme(
+    legend.position = "none",
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_blank()
+  ) +
   ggtitle("ISI Box Plot") +
   labs(x = "ISI", y = "Value")
 
-ggplot(df %>% filter(variable == "DC"), aes(x=variable, y=value, fill=variable)) +
+ggplot(df %>% filter(variable == "DC"), aes(x = variable, y = value, fill = variable)) +
   geom_boxplot() +
   theme_classic() +
-  theme(legend.position = "none", 
-        axis.ticks.x = element_blank(),
-        axis.text.x = element_blank()) +
+  theme(
+    legend.position = "none",
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_blank()
+  ) +
   ggtitle("DC Box Plot") +
   labs(x = "DC", y = "Value")
 
@@ -216,7 +223,23 @@ We can make the following observations,
 result and explain your answer.
 
 ``` {r}
+# Plot normal histogram
+ggplot(forestfires, aes(DMC)) +
+  geom_histogram(binwidth = 50, color = "black", fill = "#08d9d6") +
+  theme_classic() +
+  ggtitle("DMC Histogram")
 
+# Plot log scale histogram
+ggplot(forestfires, aes(log10(DMC))) +
+  geom_histogram(bins = 8, color = "black", fill = "#08d9d6") +
+  theme_classic() +
+  ggtitle("LOG DMC Histogram") +
+  scale_x_log10()
 ```
+
+We can make the following observations -
+(1) The normal histogram of DMC tells us that it follows a normal distribution with most values of the range 100-150. It is slightly left skewed.
+
+(2) The Histogram of log(DMC) supports the observations made in (1). Since most of the DMC values are between 100-300, it makes sense that the log(DMC) histogram shows the majority of values at 2 (since log10(X>100) lies in range 1-2).
 
 ---
