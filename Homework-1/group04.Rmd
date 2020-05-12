@@ -260,23 +260,47 @@ friends_count <- filter(M01_quasi_twitter, friends_count > 0)
 # Since the data is skewed, we can't plot the normal histogram.
 # So we plot the log scale histogram
 ggplot(friends_count, aes(log10(friends_count))) +
-  geom_histogram() +
+  geom_histogram(color = "black", fill = "#08d9d6") +
   scale_x_log10()
 
 # Use the descdist function from the fitdistrplus package to fit a distribution
 descdist(friends_count$friends_count)
 
 # Let's try and verify these observations
-fit_n <- fitdist(friends_count$friends_count, "norm")
 fit_lnorm <- fitdist(friends_count$friends_count, "lnorm")
 
 # Plot goodness-of-fit plots
 plot(fit_lnorm)
 
-
 rm(friends_count, fit_lnorm)
 ```
 
 From the log histogram as well as the goodness-of-fit-plots, we can say that the friend_count variable follows a lognormal distribution.
+
+---
+
+(b) Compute the summery statistics (min, 1Q, mean, median, 3Q, max) on
+friend_count.
+
+``` {r}
+# Calculate the Quantiles
+quantiles <- quantile(M01_quasi_twitter$friends_count)
+
+# Print
+cat("Minimum friends_count is :", quantiles[[1]], "\n")
+cat("1st Quantile of friends_count is :", quantiles[[2]], "\n")
+cat("Mean friends_count is :", mean(M01_quasi_twitter$friends_count), "\n")
+cat("Median friends_count is :", quantiles[[3]], "\n")
+cat("3rd Quartile of friends_count is :", quantiles[[4]], "\n")
+cat("Maximum friends_count is :", quantiles[[5]], "\n")
+
+rm(quantiles)
+```
+
+---
+
+(c) How is the data quality in friend_count variable? Interpret your answer.
+
+The friends_count variable is a highly skewed variable. It also has incorrect data as one user has -84 friends which is not possible. Although most of the users have friends_count in the hundreds, a few users with friends_count in hundreds of thousands skew the distribution significantly. Overall, the quality of the friend_count variable is not that good.
 
 ---
