@@ -12,10 +12,12 @@ output:
 ``` {r message = FALSE}
 library(ggplot2)
 library(GGally)
-library(ggpubr)
+library(cowplot)
 library(dplyr)
 library(reshape2)
 library(fitdistrplus)
+library(scatterplot3d)
+library(plotrix)
 library(RColorBrewer)
 ```
 
@@ -62,10 +64,7 @@ p4 <- ggplot(forestfires, aes(RH, area)) +
   theme_classic()
 
 # Arrange plots P1-P4 into a 2x2 grid
-fig <- ggarrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
-
-
-plot(fig)
+plot_grid(p1, p2, p3, p4)
 
 rm(list = c("p1", "p2", "p3", "p4", "fig"))
 ```
@@ -170,9 +169,8 @@ your result.
 ``` {r, warning = FALSE}
 
 # Create a temporary dataframe and reshape it
-df <- forestfires %>% select(wind, ISI, DC)
 suppressMessages({
-  df <- melt(df)
+  df <- melt(forestfires)
 })
 
 # Plot 3 boxplots for Wind, ISI, and DC
@@ -302,5 +300,61 @@ rm(quantiles)
 (c) How is the data quality in friend_count variable? Interpret your answer.
 
 The friends_count variable is a highly skewed variable. It also has incorrect data as one user has -84 friends which is not possible. Although most of the users have friends_count in the hundreds, a few users with friends_count in hundreds of thousands skew the distribution significantly. Overall, the quality of the friend_count variable is not that good.
+
+---
+
+(d) Produce a 3D scatter plot with highlighting to impression the depth for variables
+below on M01_quasi_twitter.csv dataset. created_at_year, education, age. 
+Put the name of the scatter plot “3D scatter plot”.
+
+``` {r}
+# Create and Plot the 3D Scatter Plot
+scatterplot3d(
+  x = M01_quasi_twitter$created_at_year, 
+  y = M01_quasi_twitter$education, 
+  z = M01_quasi_twitter$age, 
+  main = "3D scatter plot",
+  xlab = "created_at_year",
+  ylab = "education",
+  zlab = "age",
+  highlight.3d = TRUE)
+```
+
+(e) Consider 650, 1000, 900, 300 and 14900 tweeter accounts are in UK, Canada,
+India, Australia and US, respectively. Plot the percentage Pie chart includes 
+percentage amount and country name adjacent to it, and also plot 3D pie chart
+for those countries along with the percentage pie chart. Hint: Use C=(1, 2) matrix
+form to plot the charts together.
+
+``` {r}
+# Create a temporary dataframe for the data
+df <- data.frame("country" = c("UK", "Canada", "India", "Australia", "US"),
+                 "num_accounts" = c(650, 1000, 900, 300, 14900))
+
+# Mutate the dataframe to create a percentages columns
+df <- df %>%
+      group_by(country) %>%
+      arrange(desc(country)) %>%
+      mutate(prop = 100 * round(num_accounts / sum(df$num_accounts), 3)) %>%
+      mutate(percentage_labels = paste0(prop, "%")) 
+
+# Define the grid, 1 row x 2 columns
+par(mfcol = c(1, 2), mar = c(5, 5, 5, 5))
+
+# 3D Pie chart
+pie3D(df$prop, 
+      radius = 0.9, 
+      labels = df$country, 
+      main = "Country 3D Pie Chart")
+# Regular Pie Chart
+pie(df$prop, 
+    labels = paste0(df$country, " ", df$percentage_labels), 
+    col = brewer.pal(5, "Dark2"),
+    cex = 1)
+
+
+
+rm(df)
+``` 
 
 ---
