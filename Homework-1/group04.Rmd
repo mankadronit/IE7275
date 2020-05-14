@@ -29,7 +29,7 @@ through December combined in one graph. Hint: Place area on Y axis and use
 
 ``` {r}
 # Import the Dataframe
-forestfires <- data.frame(read.csv("./data/forestfires.csv"),
+forestfires <- data.frame(read.csv("forestfires.csv"),
   stringsAsFactors = FALSE
 )
 
@@ -66,7 +66,7 @@ p4 <- ggplot(forestfires, aes(RH, area)) +
 # Arrange plots P1-P4 into a 2x2 grid
 plot_grid(p1, p2, p3, p4)
 
-rm(list = c("p1", "p2", "p3", "p4", "fig"))
+rm(list = c("p1", "p2", "p3", "p4"))
 ```
 
 (b) Plot the histogram of wind speed (km/h).
@@ -250,7 +250,7 @@ We can make the following observations -
 
 ``` {r warning = FALSE, message = FALSE}
 # Import the Twitter Data csv
-M01_quasi_twitter <- data.frame(read.csv("./data/M01_quasi_twitter.csv"))
+M01_quasi_twitter <- data.frame(read.csv("M01_quasi_twitter.csv"))
 
 # Filter out negative values
 friends_count <- filter(M01_quasi_twitter, friends_count > 0)
@@ -310,14 +310,15 @@ Put the name of the scatter plot “3D scatter plot”.
 ``` {r}
 # Create and Plot the 3D Scatter Plot
 scatterplot3d(
-  x = M01_quasi_twitter$created_at_year, 
-  y = M01_quasi_twitter$education, 
-  z = M01_quasi_twitter$age, 
+  x = M01_quasi_twitter$created_at_year,
+  y = M01_quasi_twitter$education,
+  z = M01_quasi_twitter$age,
   main = "3D scatter plot",
   xlab = "created_at_year",
   ylab = "education",
   zlab = "age",
-  highlight.3d = TRUE)
+  highlight.3d = TRUE
+)
 ```
 
 (e) Consider 650, 1000, 900, 300 and 14900 tweeter accounts are in UK, Canada,
@@ -328,29 +329,33 @@ form to plot the charts together.
 
 ``` {r}
 # Create a temporary dataframe for the data
-df <- data.frame("country" = c("UK", "Canada", "India", "Australia", "US"),
-                 "num_accounts" = c(650, 1000, 900, 300, 14900))
+df <- data.frame(
+  "country" = c("UK", "Canada", "India", "Australia", "US"),
+  "num_accounts" = c(650, 1000, 900, 300, 14900)
+)
 
 # Mutate the dataframe to create a percentages columns
 df <- df %>%
-      group_by(country) %>%
-      arrange(desc(country)) %>%
-      mutate(prop = 100 * round(num_accounts / sum(df$num_accounts), 3)) %>%
-      mutate(percentage_labels = paste0(prop, "%")) 
+  group_by(country) %>%
+  arrange(desc(country)) %>%
+  mutate(prop = 100 * round(num_accounts / sum(df$num_accounts), 3)) %>%
+  mutate(percentage_labels = paste0(prop, "%"))
 
 # Define the grid, 1 row x 2 columns
 par(mfcol = c(1, 2), mar = c(5, 5, 5, 5))
 
 # 3D Pie chart
-pie3D(df$prop, 
-      radius = 0.9, 
-      labels = df$country, 
-      main = "Country 3D Pie Chart")
+pie3D(df$prop,
+  radius = 0.9,
+  labels = df$country,
+  main = "Country 3D Pie Chart"
+)
 # Regular Pie Chart
-pie(df$prop, 
-    labels = paste0(df$country, " ", df$percentage_labels), 
-    col = brewer.pal(5, "Dark2"),
-    cex = 1)
+pie(df$prop,
+  labels = paste0(df$country, " ", df$percentage_labels),
+  col = brewer.pal(5, "Dark2"),
+  cex = 1
+)
 
 
 
@@ -363,15 +368,86 @@ result
 ``` {r}
 ggplot(M01_quasi_twitter, aes(x = created_at_year)) +
   geom_density() +
-  scale_x_continuous( breaks = c(2006, 2007, 2008, 
-                              2009, 2010, 2011, 
-                              2012, 2013, 2014, 
-                              2015, 2016, 2017),
-                    labels = c("2006", "2007", "2008", 
-                              "2009", "2010", "2011", 
-                              "2012", "2013", "2014", 
-                              "2015", "2016", "2017"))
+  scale_x_continuous(
+    breaks = c(
+      2006, 2007, 2008,
+      2009, 2010, 2011,
+      2012, 2013, 2014,
+      2015, 2016, 2017
+    ),
+    labels = c(
+      "2006", "2007", "2008",
+      "2009", "2010", "2011",
+      "2012", "2013", "2014",
+      "2015", "2016", "2017"
+    )
+  )
 ```
 
 We can observe that the highest number of accounts are created in the year 2009. We can also observe that a sudden surge in the number of accounts was observed in 2014.
 ---
+
+## Problem 3
+
+(a) Standardize the data and create new dataset with standardized data and name it
+Ndata.
+
+``` {r}
+# Import the raw_data.csv file
+raw_data <- data.frame(read.csv("raw_data.csv"), stringsAsFactors = FALSE)
+
+# Standardize the data frame using the scale function
+Ndata <- as.data.frame(scale(raw_data))
+```
+
+(b) Create the boxplot of all the variables in their original form.
+
+``` {r}
+
+# Reshape the dataframe to a shape suitable for plotting
+df <- melt(raw_data)
+
+# Create box plots
+ggplot(df, aes(variable, value, fill = "value")) +
+  geom_boxplot() +
+  theme_classic() +
+  ggtitle("Box Plot for raw_data") +
+  labs(x = "") +
+  theme(legend.position = "none")
+
+rm(df)
+```
+
+(c) Create boxplot of all the variables in their standardized form
+
+``` {r}
+
+# Reshape the dataframe to a shape suitable for plotting
+df <- melt(Ndata)
+
+# Create box plots
+ggplot(df, aes(variable, value, fill = "value")) +
+  geom_boxplot() +
+  theme_classic() +
+  ggtitle("Box Plot for Ndata") +
+  labs(x = "") +
+  theme(legend.position = "none")
+
+rm(df)
+```
+
+(d) Compare the result of part b and part c; interpret your answer.
+
+- As we can see from both boxplots, the standardization step transforms all of the columns to a std. normal distribution with a mean of 0 and a standard deviation of 1. This also brings the data to a same scale.
+
+(e) Prepare scatter plot of variables A and B. How are the data correlated in these
+variables? Interpret your answer.
+
+``` {r}
+# Creating the scatterplots
+ggplot(raw_data, aes(A, B)) +
+  geom_point() +
+  ggtitle("Scatterplot of A and B")
+```
+
+By analyzing the scatterplot of A and B, it is safe to say that they have little to no correlation among themselves, i.e they are independent.
