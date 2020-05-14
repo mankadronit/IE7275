@@ -357,4 +357,21 @@ pie(df$prop,
 rm(df)
 ``` 
 
+(f) Create kernel density plot of created_at_year variable and interpret the
+result
+
+``` {r}
+ggplot(M01_quasi_twitter, aes(x = created_at_year)) +
+  geom_density() +
+  scale_x_continuous( breaks = c(2006, 2007, 2008, 
+                              2009, 2010, 2011, 
+                              2012, 2013, 2014, 
+                              2015, 2016, 2017),
+                    labels = c("2006", "2007", "2008", 
+                              "2009", "2010", "2011", 
+                              "2012", "2013", "2014", 
+                              "2015", "2016", "2017"))
+```
+
+We can observe that the highest number of accounts are created in the year 2009. We can also observe that a sudden surge in the number of accounts was observed in 2014.
 ---
