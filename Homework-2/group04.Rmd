@@ -41,13 +41,19 @@ fa.parallel(df, fa = "pc", n.iter = 100, show.legend = FALSE)
 ```
 
 
-From the above plot it will be appropriate to use 1 factor.
+From the above plot it will be appropriate to use 1 factor, but we will use 2 factors since a single factor might not be enough to capture enough of the variance.
 
 ``` {r}
 # Perform PCA with varimax orthogonal rotation
 pc <- principal(df, nfactors = 2, rotate = "varimax", scores = TRUE)
 
 pc
+```
+
+Let's see the component scores 
+
+``` {r}
+head(pc$scores)
 ```
 
 ``` {r}
@@ -57,11 +63,80 @@ factor.plot(pc, choose = c(1), labels = colnames(df), title = "PCA Component 1")
 factor.plot(pc, choose = c(2), labels = colnames(df), title = "PCA Component 2")
 
 factor.plot(pc, labels = colnames(df))
+
+rm(list = ls())
 ```
 
 Observations made from the plots - 
 - Face and PPP loads only on Component-2. 
 - gg, gag, five, PKP, sc1, tr1, lead1, lead2, wop and wosp load only on Component-1.
 - shots and sag load on both Component-1 and Component-2.
+
+---
+
+# Problem 2
+Perform principal component analysis on Glass Identification Data.xlsx
+• Input the raw data matrix to fa.parallel() function to determine the number of components to extract
+• Input the raw data matrix to principal() function to extract the components. If raw data is input, the correlation matrix is automatically calculated by principal() function.
+• Rotate the components
+• Compute component scores
+• Graph an orthogonal solution using factor.plot()
+• Interpret the results
+
+``` {r}
+glass_identification_data <- data.frame(read_xlsx("./data/Glass Identification Data.xlsx", 
+                                                  sheet = "Glass Data"))
+
+df <- glass_identification_data[, 2:10]
+
+fa.parallel(df, fa = "pc", n.iter = 100, show.legend = FALSE)
+```
+
+The Skree Plot and the fa.parallel() function suggests nfactors = 4.
+
+``` {r}
+# Perform PCA with 
+pc <- principal(df, nfactors = 4, rotate = "equamax", scores = TRUE)
+
+pc
+```
+
+``` {r}
+head(pc$scores)
+```
+
+
+``` {r}
+# Plot the components and analyze them
+factor.plot(pc, choose = c(1), labels = colnames(df), title = "PCA Component 1")
+factor.plot(pc, choose = c(2), labels = colnames(df), title = "PCA Component 2")
+factor.plot(pc, choose = c(3), labels = colnames(df), title = "PCA Component 3")
+factor.plot(pc, choose = c(4), labels = colnames(df), title = "PCA Component 4")
+
+
+factor.plot(pc, choose = c(1, 2), labels = colnames(df))
+factor.plot(pc, choose = c(1, 3), labels = colnames(df))
+factor.plot(pc, choose = c(1, 4), labels = colnames(df))
+factor.plot(pc, choose = c(2, 3), labels = colnames(df))
+factor.plot(pc, choose = c(2, 4), labels = colnames(df))
+factor.plot(pc, choose = c(3, 4), labels = colnames(df))
+
+rm(list = ls())
+```
+
+Observations made - 
+- PC1: loads RI, CA, Mg, Al and K.
+
+- PC2: loads Mg, Al and Ba.
+
+- PC3: loads Na, K, Ba and Fe.
+
+- PC4: loads RI and Si.
+
+Hence -
+1. PC1 signifies Calcium, Potassium, Magnesium and Aluminum heavy glass. It also signifies glass with high refractive index.
+2. PC2 signifies glass with high Magnesium, Aluminum and Barium concentration.
+3. PC3 signifies glass with high Sodium, Potassium, Barium and Iron concentration.
+4. PC4 signifies glass with high Refractive Index and Silicon concentration.
 
 ---
