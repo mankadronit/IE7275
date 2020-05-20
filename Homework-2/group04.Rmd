@@ -26,7 +26,6 @@ Perform principal component analysis on NHL.xlsx, which contains statistics of 3
 library(dplyr)
 library(readxl)
 library(psych)
-library(ggbiplot)
 ```
 
 
@@ -37,7 +36,7 @@ NHL <- data.frame(read_xlsx("./data/NHL.xlsx", sheet = "Data"))
 # Select the columns 13-26, the 1st column is the index column from excel
 df <- NHL[, 13:26]
 
-# Use Parallel Analysis Scree Plots to figure out the number of factors to extract 
+# Use Parallel Analysis Scree Plots to figure out the number of factors to extract
 fa.parallel(df, fa = "pc", n.iter = 100, show.legend = FALSE)
 ```
 
@@ -46,12 +45,23 @@ From the above plot it will be appropriate to use 1 factor.
 
 ``` {r}
 # Perform PCA with varimax orthogonal rotation
-pc <- principal(df, nfactors = 1, rotate = "varimax", scores = TRUE)
+pc <- principal(df, nfactors = 2, rotate = "varimax", scores = TRUE)
 
 pc
+```
+
+``` {r}
+
+# Plot the components and analyze them
+factor.plot(pc, choose = c(1), labels = colnames(df), title = "PCA Component 1")
+factor.plot(pc, choose = c(2), labels = colnames(df), title = "PCA Component 2")
 
 factor.plot(pc, labels = colnames(df))
 ```
 
-
 Observations made from the plots - 
+- Face and PPP loads only on Component-2. 
+- gg, gag, five, PKP, sc1, tr1, lead1, lead2, wop and wosp load only on Component-1.
+- shots and sag load on both Component-1 and Component-2.
+
+---
