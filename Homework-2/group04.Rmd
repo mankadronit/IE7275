@@ -305,16 +305,16 @@ Perform factor analysis on Herman74.cor, which is a data structure available in 
 
 fa.parallel(Harman74.cor$cov,
   n.obs = Harman74.cor$n.obs,
-  fa = "pc", n.iter = 100, show.legend = FALSE
+  n.iter = 100
 )
 ```
 
-The Screeplot suggests 3 components.
+The Screeplot suggests 4 components.
 
 ``` {r}
 # Perform Factor Analysis
 correlations <- cov2cor(Harman74.cor$cov)
-fa <- fa(correlations, nfactors = 3, rotate = "none", scores = TRUE, fm = "pa")
+fa <- fa(correlations, nfactors = 4, rotate = "none", scores = TRUE)
 
 fa
 ```
@@ -322,7 +322,7 @@ fa
 Rotate the factors
 
 ``` {r}
-fa_orthogonal <- fa(correlations, nfactors = 3, rotate = "varimax", scores = TRUE, fm = "pa")
+fa_orthogonal <- fa(correlations, nfactors = 4, rotate = "varimax", scores = TRUE)
 
 fa_orthogonal
 ```
@@ -339,13 +339,14 @@ Plotting an orthogonal solution
 factor.plot(fa_orthogonal, choose = c(1), labels = rownames(fa$loadings))
 factor.plot(fa_orthogonal, choose = c(2), labels = rownames(fa$loadings))
 factor.plot(fa_orthogonal, choose = c(3), labels = rownames(fa$loadings))
+factor.plot(fa_orthogonal, choose = c(4), labels = rownames(fa$loadings))
 
 factor.plot(fa_orthogonal)
 ```
 
 Now let's plot an oblique solution
 ``` {r}
-fa_oblique <- fa(Harman74.cor$cov, nfactors = 3, rotate = "promax", scores = TRUE)
+fa_oblique <- fa(Harman74.cor$cov, nfactors = 4, rotate = "promax", scores = TRUE)
 
 fa.diagram(fa_oblique)
 
@@ -354,10 +355,90 @@ rm(list = ls())
 
 We can make the following observations - 
 
-- Component 1 seems to be related to language related attributes like Sentence Completion, WordMeaning, Word Classification etc.
+- Factor 1 seems to be related to language related attributes like Sentence Completion, WordMeaning, Word Classification etc.
 
-- Component 2 seems to be related to more general problem solving attributes like Deduction, Problem Reasoning, Cubes, Flage etc.
+- Factor 2 seems to be related to more general problem solving attributes like Deduction, Problem Reasoning, Cubes, Flage etc.
 
-- Component 3 seems to be related to mathematical attributes like Code, Counting Dota, Addition, Number Recognition etc.
+- Factor 3 seems to be related to mathematical attributes like Code, Counting Data, Addition, Number Recognition etc.
+
+- Factor 4 seems to be related to Word and Number recognition.
+
+---
+
+# Problem 5
+Perform multidimensional scaling on Vertebral Column Data.xlsx
+
+• Input the raw data matrix to fa.parallel() function to determine the number of components to extract
+
+• Input the raw data matrix to cmdscale() function to perform multidimensional scaling. cmdscale() function which is available in the base installation performs a classical multidimensional scaling.
+
+• Graph an orthogonal solution using factor.plot()
+
+• Interpret the results
+
+``` {r}
+vertebral_column_data <- data.frame(read_xlsx("./data/Vertebral Column Data.xlsx",
+  sheet = "column_3C"
+))
+
+fa.parallel(vertebral_column_data[, 1:6], n.iter = 100)
+```
+
+Scree Plots suggests number of factors 3
+
+``` {r}
+
+# Calculate the distance matrix
+d <- dist(vertebral_column_data[, 1:6])
+
+# Perform Multidimensional Scaling
+fit <- cmdscale(d, k = 3, eig = TRUE)
+```
+
+The MDS has reduced the data to 3 dimensions
+
+``` {r}
+head(fit$points)
+```
+
+This is the same as calculating 3 factors.
+
+Let's graph the orthogonal solution now
+
+``` {r}
+
+pc <- principal(vertebral_column_data[, 1:6], nfactors = 3, rotate = "varimax")
+
+factor.plot(pc, choose = c(1), labels = c(
+  "pelvic incidence", "pelvic tilt",
+  "lumbar lordosis angle", "sacral slope",
+  "pelvic radius", " grade of spondylolisthesis."
+))
+
+factor.plot(pc, choose = c(2), labels = c(
+  "pelvic incidence", "pelvic tilt",
+  "lumbar lordosis angle", "sacral slope",
+  "pelvic radius", " grade of spondylolisthesis."
+))
+factor.plot(pc, choose = c(3), labels = c(
+  "pelvic incidence", "pelvic tilt",
+  "lumbar lordosis angle", "sacral slope",
+  "pelvic radius", " grade of spondylolisthesis."
+))
+
+factor.plot(pc, labels = c(
+  "pelvic incidence", "pelvic tilt",
+  "lumbar lordosis angle", "sacral slope",
+  "pelvic radius", " grade of spondylolisthesis."
+))
+```
+
+We can make the following observations -
+
+- Component 1 loads pelvic incidence, lumbar lordosis angle, sacral slope and grade of spondylolisthesis. 
+
+- Component 2 loads pelvic incidence and pelvic tilt.
+
+- Component 3 loads sacral slope and pelvic radius.
 
 ---
