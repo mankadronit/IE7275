@@ -37,7 +37,7 @@ library(psych)
 
 ``` {r message = FALSE}
 # Import the NHL excel file as a dataframe
-NHL <- data.frame(read_xlsx("./data/NHL.xlsx", sheet = "Data"))
+NHL <- data.frame(read_xlsx("NHL.xlsx", sheet = "Data"))
 
 # Select the columns 13-26, the 1st column is the index column from excel
 df <- NHL[, 13:26]
@@ -103,7 +103,7 @@ Perform principal component analysis on Glass Identification Data.xlsx
 • Interpret the results
 
 ``` {r}
-glass_identification_data <- data.frame(read_xlsx("./data/Glass Identification Data.xlsx",
+glass_identification_data <- data.frame(read_xlsx("Glass Identification Data.xlsx",
   sheet = "Glass Data"
 ))
 
@@ -365,6 +365,110 @@ We can make the following observations -
 
 ---
 
+# Problem 4 
+
+Perform factor analysis on breast-cancer-wisconsin.xlsx, is a multivariate dataset that is used to predict whether a cancer is malignant or benign from biopsy details of 699 patients with 11 attributes. Create a new data frame by removing the variable “BN”.
+
+• Calculate the correlation matrix from the new data frame. Visualize the correlation matrix using pairs.panels function of the “psych” package. How would you interpret the result in terms of correlation among the variables?
+
+• Input the correlation matrix to fa.parallel() function to determine the number of components to extract
+
+• Input the correlation matrix to fa() function to extract the components. If raw data is input, the correlation matrix is automatically calculated by fa() function.
+
+• Rotate the factors
+
+• Compute factor scores
+
+• Graph an orthogonal solution using factor.plot()
+
+• Graph an oblique solutions using fa.diagram()
+
+• Interpret the results
+
+``` {r}
+breast_cancer <- read_xlsx("breast-cancer-wisconsin.xlsx",
+  sheet = "breast-cancer-wisconsin.csv"
+)
+
+breast_cancer <- select(breast_cancer, c(1, 2, 3, 4, 5, 6, 8, 9, 10, 11))
+
+bc.cor <- cor(breast_cancer[, 2:9])
+```
+
+Visualize the correlation
+
+``` {r}
+pairs.panels(bc.cor)
+```
+
+We can interpret the following from the plot -
+
+- all the variables are highly correlated to each other except the following pairs:
+  1. CT and NN
+  2. CT and MA
+  3. CT and SECS
+  4. CT and BC
+
+Let's now analysze the scree plot
+
+``` {r}
+fa.parallel(bc.cor, n.obs = 699)
+```
+
+According to the scree plot the appropriate number of factors are 1
+
+``` {r}
+fa <- fa(bc.cor, nfactors = 1, rotate = "none", n.obs = 699, fm = "pa")
+
+fa
+```
+
+Rotate the factors now 
+
+``` {r}
+fa_orthogonal <- fa(bc.cor, nfactors = 1, rotate = "varimax", fm = "pa", scores = TRUE)
+
+fa_orthogonal
+```
+
+The factor scores are :
+```{r}
+fa_orthogonal$weights
+```
+
+Let's plot an orthogonal solution 
+
+``` {r}
+factor.plot(fa_orthogonal, labels = colnames(bc.cor))
+```
+
+Let's plot an oblique solution
+
+``` {r}
+fa_oblique <- fa(bc.cor, nfactors = 1, rotate = "promax", fm = "pa", scores = TRUE)
+
+fa_oblique
+```
+
+Let's plot the oblique solution
+
+``` {r}
+factor.plot(fa_oblique, labels = colnames(bc.cor))
+
+fa.diagram(fa_oblique)
+
+rm(list = ls())
+```
+
+We can make the following observations - 
+
+The high loading scores and the test of hypothesis of the
+factor analysis indicate that one factor is sufficient to explain all the variables owing to their 
+high loading scores, indicating high values for communality.
+both the orthoganal and oblique plot reinforce the same.
+
+---
+
 # Problem 5
 Perform multidimensional scaling on Vertebral Column Data.xlsx
 
@@ -377,7 +481,7 @@ Perform multidimensional scaling on Vertebral Column Data.xlsx
 • Interpret the results
 
 ``` {r}
-vertebral_column_data <- data.frame(read_xlsx("./data/Vertebral Column Data.xlsx",
+vertebral_column_data <- data.frame(read_xlsx("Vertebral Column Data.xlsx",
   sheet = "column_3C"
 ))
 
@@ -431,6 +535,8 @@ factor.plot(pc, labels = c(
   "lumbar lordosis angle", "sacral slope",
   "pelvic radius", " grade of spondylolisthesis."
 ))
+
+rm(list = ls())
 ```
 
 We can make the following observations -
