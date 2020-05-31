@@ -1,0 +1,152 @@
+---
+title: "Group 04"
+output: html_notebook
+---
+
+# Problem 1: Gradient Descent Algorithm for Multiple Linear Regression
+
+The file concrete.csv includes 1,030 types of concrete with numerical features indicating
+characteristics of the concrete. The variable “strength” is treated as the response variable.
+
+• Standardize all variables (including the response variable “strength”). Split the data set
+into a training set (60%) and a validation set (40%).
+
+• Implement the gradient descent algorithm in R with the ordinary least square cost
+function.
+
+• Fit the multiple linear regression model using the gradient descent algorithm and the
+training set. Try out different learning rates: 𝛼 = 0.01,0.1,0.3,0.5 and compare the speed
+of convergence by plotting the cost function. Determine the number of iterations needed
+for each 𝛼 value.
+
+• Apply the fitted regression model to the validation set and evaluate the model
+performance (ME, RMSE, MAE, MPE, MPAE). Calculate the correlation between the
+predicted strength and the actual strength. Create a lift chart to show model
+performance.
+
+``` {r message = FALSE}
+library(dplyr)
+library(ggplot2)
+
+
+df <- data.frame(read.csv("concrete.csv"))
+
+# Scale the dataframe
+df <- as.data.frame(scale(df))
+
+# Split into train and validation datasets
+training_rows <- sample(seq_len(nrow(df)), size = floor(0.6*nrow(df)))
+
+train_data <- df[training_rows,]
+validation_data <- df[-training_rows,]
+
+```
+
+Implementing Gradient Descent algorithm with the Ordinary Least Square cost function.
+
+``` {r}
+gradient_desc <- function(x, y, lr, iters) {
+  # First we create a list to keep the track
+  # of the cost function for each iteration
+  y <- as.matrix(y)
+  costs <- list()
+  
+  # create a column of 1
+  ones <- as.data.frame(rep(1, dim(x)[[1]]))
+  # append it to the input (this is our X0)
+  X = as.matrix(cbind(ones, x))
+  # Calculate number of samples
+  n = length(y)
+  
+  # Initialize model parameters
+  theta <- as.matrix(rnorm(n = dim(X)[2], 0, 1))
+  
+  # Calculate model predictions
+  y_hat <- X %*% theta
+      
+  # Calculate the error
+  cost <- sum((y_hat - y)^2)/(2*n)
+  
+  # Calculate the gradients of the cost function
+  grads <- t(X) %*% (y_hat - y)
+  
+  # Update theta
+  theta <- theta - lr * (1/n) * grads
+  
+  
+  # That was the first iteration of the gradient descent algorithm
+  # Let's add the cost function to the list
+  costs[[1]] <- cost
+  
+  
+  counter <- 0
+  for(i in 1:iters) {
+    # Calculate model predictions
+    y_hat <- X %*% theta
+      
+    # Calculate the error
+    cost <- sum((y_hat - y)^2)/(2*n)
+  
+    # Calculate the gradients
+    grads <- t(X) %*% (y_hat - y)
+  
+    # Update theta
+    theta <- theta - lr * (1/n) * grads
+    
+    # Add cost to the list
+    costs[[i + 1]] <- cost
+   
+    if(round(costs[[i]], 7) <= round(cost, 7)) {
+      if(counter > 6) {
+        break
+      } else {
+        counter <- counter + 1
+      }
+    } else {
+      counter <- 0
+    }
+  }
+  
+  index <- length(costs) - counter
+  # return the theta (aka model weights)
+  return(list(theta, costs[1:index]))
+}
+
+# Predict function 
+predict <- function(x, theta) {
+  ones <- rep(1, dim(x)[[1]])
+  # append it to the input (this is our X0)
+  X = as.matrix(cbind(ones, x))
+  
+  return(X %*% theta)
+}
+
+normalest <- function(X, y){
+    X = data.frame(rep(1,length(y)),X)
+    X = as.matrix(X)
+    theta = solve(t(X)%*%X)%*%t(X)%*%y
+    return(theta)
+}
+
+```
+
+``` {r}
+model1 <- gradient_desc(train_data[, 1:8], train_data$strength, lr = 0.01, iters = 10000)
+
+model1_weights <- model1[[1]]
+model1_costs <- model1[[2]]
+
+model1_predictions <- predict(train_data[, 1:8], model1_weights)
+
+print(model1_weights)
+```
+
+``` {r}
+normalest(train_data[, 1:8], train_data$strength)
+
+plot(1:length(model1_costs), model1_costs)
+lines(1:length(model1_costs), model1_costs)
+```
+
+# Problem 2
+---
