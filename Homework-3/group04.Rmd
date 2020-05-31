@@ -2,8 +2,8 @@
 title: "Homework - 3"
 author: "Group 04"
 output:
-  word_document: default
   pdf_document: default
+  word_document: default
   html_notebook: default
 ---
 
@@ -23,9 +23,9 @@ into a training set (60%) and a validation set (40%).
 function.
 
 • Fit the multiple linear regression model using the gradient descent algorithm and the
-training set. Try out different learning rates: 𝛼 = 0.01,0.1,0.3,0.5 and compare the speed
+training set. Try out different learning rates: alpha = 0.01,0.1,0.3,0.5 and compare the speed
 of convergence by plotting the cost function. Determine the number of iterations needed
-for each 𝛼 value.
+for each alpha value.
 
 • Apply the fitted regression model to the validation set and evaluate the model
 performance (ME, RMSE, MAE, MPE, MPAE). Calculate the correlation between the
@@ -364,3 +364,7 @@ rm(list = ls())
 ```
 
 ---
+
+# Problem 2
+
+
