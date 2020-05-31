@@ -1,7 +1,15 @@
 ---
-title: "Group 04"
-output: html_notebook
+title: "Homework - 3"
+author: "Group 04"
+output:
+  word_document: default
+  pdf_document: default
+  html_notebook: default
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 # Problem 1: Gradient Descent Algorithm for Multiple Linear Regression
 
@@ -24,129 +32,335 @@ performance (ME, RMSE, MAE, MPE, MPAE). Calculate the correlation between the
 predicted strength and the actual strength. Create a lift chart to show model
 performance.
 
-``` {r message = FALSE}
+``` {r}
+# Import Required Packages
 library(dplyr)
+library(data.table)
+library(reshape2)
+library(MLmetrics)
 library(ggplot2)
 
-
-df <- data.frame(read.csv("concrete.csv"))
+# Read the csv file
+df <- data.table(read.csv("concrete.csv"))
 
 # Scale the dataframe
 df <- as.data.frame(scale(df))
 
 # Split into train and validation datasets
-training_rows <- sample(seq_len(nrow(df)), size = floor(0.6*nrow(df)))
+training_rows <- sample(seq_len(nrow(df)), size = floor(0.6 * nrow(df)))
 
-train_data <- df[training_rows,]
-validation_data <- df[-training_rows,]
-
+train_data <- df[training_rows, ]
+validation_data <- df[-training_rows, ]
 ```
 
 Implementing Gradient Descent algorithm with the Ordinary Least Square cost function.
 
 ``` {r}
+# Define the gradient descent function
 gradient_desc <- function(x, y, lr, iters) {
   # First we create a list to keep the track
   # of the cost function for each iteration
+  losses <- list()
+
+  # Convert y to a matrix
   y <- as.matrix(y)
-  costs <- list()
-  
+
   # create a column of 1
-  ones <- as.data.frame(rep(1, dim(x)[[1]]))
+  ones <- rep(1, dim(x)[[1]])
   # append it to the input (this is our X0)
-  X = as.matrix(cbind(ones, x))
+  X <- as.matrix(cbind(ones, x))
   # Calculate number of samples
-  n = length(y)
-  
-  # Initialize model parameters
+  n <- length(y)
+
+  # Initialize model parameters/coefficients
   theta <- as.matrix(rnorm(n = dim(X)[2], 0, 1))
-  
+
   # Calculate model predictions
   y_hat <- X %*% theta
-      
-  # Calculate the error
-  cost <- sum((y_hat - y)^2)/(2*n)
-  
+
+  # calculate the loss using OLS cost function
+  loss <- sum((y_hat - y)^2) / (2 * n)
+
   # Calculate the gradients of the cost function
   grads <- t(X) %*% (y_hat - y)
-  
+
   # Update theta
-  theta <- theta - lr * (1/n) * grads
-  
-  
+  theta <- theta - lr * (1 / n) * grads
+
+
   # That was the first iteration of the gradient descent algorithm
   # Let's add the cost function to the list
-  costs[[1]] <- cost
-  
-  
+  losses[[1]] <- loss
+
+
   counter <- 0
-  for(i in 1:iters) {
+  # Number of iterations required to get the lowest loss
+  sufficient_iterations <- 0
+  for (i in 1:iters) {
     # Calculate model predictions
     y_hat <- X %*% theta
-      
-    # Calculate the error
-    cost <- sum((y_hat - y)^2)/(2*n)
-  
+
+    # Calculate the loss using OLS cost function
+    loss <- sum((y_hat - y)^2) / (2 * n)
+
     # Calculate the gradients
     grads <- t(X) %*% (y_hat - y)
-  
+
     # Update theta
-    theta <- theta - lr * (1/n) * grads
-    
+    theta <- theta - lr * (1 / n) * grads
+
     # Add cost to the list
-    costs[[i + 1]] <- cost
-   
-    if(round(costs[[i]], 7) <= round(cost, 7)) {
-      if(counter > 6) {
+    losses[[i + 1]] <- loss
+
+    if (round(losses[[i]], 4) <= round(loss, 4)) {
+      if (counter > 6) {
         break
       } else {
         counter <- counter + 1
+        sufficient_iterations <- sufficient_iterations + 1
       }
     } else {
       counter <- 0
+      sufficient_iterations <- sufficient_iterations + 1
     }
   }
-  
-  index <- length(costs) - counter
+
+
+  sufficient_iterations <- sufficient_iterations - counter
   # return the theta (aka model weights)
-  return(list(theta, costs[1:index]))
+  return(list(
+    "coeffs" = theta,
+    "losses" = losses,
+    "iterations_required" = sufficient_iterations,
+    "final_loss" = loss
+  ))
 }
 
-# Predict function 
+# Predict function
 predict <- function(x, theta) {
   ones <- rep(1, dim(x)[[1]])
   # append it to the input (this is our X0)
-  X = as.matrix(cbind(ones, x))
-  
-  return(X %*% theta)
-}
+  X <- as.matrix(cbind(ones, x))
 
-normalest <- function(X, y){
-    X = data.frame(rep(1,length(y)),X)
-    X = as.matrix(X)
-    theta = solve(t(X)%*%X)%*%t(X)%*%y
-    return(theta)
+  return(X %*% t(theta))
 }
-
 ```
 
-``` {r}
+Now we create and train 4 models each with a different learning rate
+
+``` {r warning = FALSE, message = FALSE}
+
+# Model 1, lr = 0.01
 model1 <- gradient_desc(train_data[, 1:8], train_data$strength, lr = 0.01, iters = 10000)
 
-model1_weights <- model1[[1]]
-model1_costs <- model1[[2]]
+model1_weights <- t(model1$coeffs)
+model1_losses <- melt(data.frame(model1$losses))
+model1_losses$index <- 1:dim(model1_losses)[[1]]
 
-model1_predictions <- predict(train_data[, 1:8], model1_weights)
 
-print(model1_weights)
+# Model 2, lr = 0.10
+model2 <- gradient_desc(train_data[, 1:8], train_data$strength, lr = 0.10, iters = 10000)
+
+model2_weights <- t(model2$coeffs)
+model2_losses <- melt(data.frame(model2$losses))
+model2_losses$index <- 1:dim(model2_losses)[[1]]
+
+# Model 3, lr = 0.30
+model3 <- gradient_desc(train_data[, 1:8], train_data$strength, lr = 0.30, iters = 10000)
+
+model3_weights <- t(model3$coeffs)
+model3_losses <- melt(data.frame(model3$losses))
+model3_losses$index <- 1:dim(model3_losses)[[1]]
+
+# Model 4, lr = 0.50
+model4 <- gradient_desc(train_data[, 1:8], train_data$strength, lr = 0.50, iters = 10000)
+
+model4_weights <- t(model4$coeffs)
+model4_losses <- melt(data.frame(model4$losses))
+model4_losses$index <- 1:dim(model4_losses)[[1]]
+```
+
+Let's plot the loss vs number of iterations for each model to evaluate their performance.
+
+``` {r}
+# Model 1
+ggplot(model1_losses, aes(x = index, y = value)) +
+  geom_point(alpha = 0.5) +
+  geom_vline(xintercept = model1$iterations_required) +
+  geom_text(x = model1$iterations_required / 2, y = 3.5, label = "Final Loss") +
+  geom_text(x = model1$iterations_required / 2, y = 3, label = as.character(round(model1$final_loss, 4))) +
+  geom_text(
+    x = model1$iterations_required,
+    y = 1,
+    label = as.character(model1$iterations_required),
+    check_overlap = TRUE
+  ) +
+  geom_text(
+    x = model1$iterations_required,
+    y = 1.25,
+    label = "Iterations Needed",
+    check_overlap = TRUE
+  ) +
+  geom_line(color = "red") +
+  labs(x = "Iteration", y = "Loss") +
+  ggtitle("Model 1 Performance (Learning Rate = 0.01)")
+
+# Model 2
+ggplot(model2_losses, aes(x = index, y = value)) +
+  geom_point(alpha = 0.5) +
+  geom_vline(xintercept = model2$iterations_required) +
+  geom_text(x = model2$iterations_required / 2, y = 3.5, label = "Final Loss") +
+  geom_text(x = model2$iterations_required / 2, y = 3, label = as.character(round(model2$final_loss, 4))) +
+  geom_text(
+    x = model2$iterations_required,
+    y = 1,
+    label = as.character(model2$iterations_required),
+    check_overlap = TRUE
+  ) +
+  geom_text(
+    x = model2$iterations_required,
+    y = 1.25,
+    label = "Iterations Needed",
+    check_overlap = TRUE
+  ) +
+  geom_line(color = "red") +
+  labs(x = "Iteration", y = "Loss") +
+  ggtitle("Model 2 Performance (Learning Rate = 0.10)")
+
+# Model 3
+ggplot(model3_losses, aes(x = index, y = value)) +
+  geom_point(alpha = 0.5) +
+  geom_vline(xintercept = model3$iterations_required) +
+  geom_text(x = model3$iterations_required / 2, y = 3.5, label = "Final Loss") +
+  geom_text(x = model3$iterations_required / 2, y = 3, label = as.character(round(model3$final_loss, 4))) +
+  geom_text(
+    x = model3$iterations_required,
+    y = 1,
+    label = as.character(model3$iterations_required),
+    check_overlap = TRUE
+  ) +
+  geom_text(
+    x = model3$iterations_required,
+    y = 1.25,
+    label = "Iterations Needed",
+    check_overlap = TRUE
+  ) +
+  geom_line(color = "red") +
+  labs(x = "Iteration", y = "Loss") +
+  ggtitle("Model 3 Performance (Learning Rate = 0.30)")
+
+# Model 4
+ggplot(model4_losses, aes(x = index, y = value)) +
+  geom_point(alpha = 0.5) +
+  geom_vline(xintercept = model4$iterations_required) +
+  geom_text(x = model4$iterations_required / 2, y = 3.5, label = "Final Loss") +
+  geom_text(x = model4$iterations_required / 2, y = 3, label = as.character(round(model4$final_loss, 4))) +
+  geom_text(
+    x = model4$iterations_required,
+    y = 1,
+    label = as.character(model4$iterations_required),
+    check_overlap = TRUE
+  ) +
+  geom_text(
+    x = model4$iterations_required,
+    y = 1.25,
+    label = "Iterations Needed",
+    check_overlap = TRUE
+  ) +
+  geom_line(color = "red") +
+  labs(x = "Iteration", y = "Loss") +
+  ggtitle("Model 4 Performance (Learning Rate = 0.50)")
 ```
 
 ``` {r}
-normalest(train_data[, 1:8], train_data$strength)
-
-plot(1:length(model1_costs), model1_costs)
-lines(1:length(model1_costs), model1_costs)
+cat("Number of iterations required for each model are :\n")
+cat("Model 1:", as.character(model1$iterations_required), "\n")
+cat("Model 2:", as.character(model2$iterations_required), "\n")
+cat("Model 3:", as.character(model3$iterations_required), "\n")
+cat("Model 4:", as.character(model4$iterations_required), "\n")
 ```
 
-# Problem 2
+As observed, the model converges faster as the learning rate increases.
+
+Testing the model on the validation data and calulcating errors -
+
+``` {r}
+# We define the Mean Error function
+ME <- function(y_hat, y) {
+  sum(y - y_hat) / length(y)
+}
+
+# We define the Mean Percentage Error Function
+MPE <- function(y_hat, y) {
+  (sum((y - y_hat) / y)) / length(y)
+}
+```
+
+
+Now let's look at the model statstics - 
+``` {r}
+model1_predictions <- predict(validation_data[, 1:8], model1_weights)
+
+cat("----Model 1 Summary ----\n")
+cat("MAE:", MAE(model1_predictions, validation_data[, 9]), "\n")
+cat("RMSE:", RMSE(model1_predictions, validation_data[, 9]), "\n")
+cat("ME:", ME(model1_predictions, validation_data[, 9]), "\n")
+cat("MPE:", MPE(model1_predictions, validation_data[, 9]), "\n")
+cat("MPAE", MAPE(model1_predictions, validation_data[, 9]), "\n")
+
+model2_predictions <- predict(validation_data[, 1:8], model2_weights)
+
+cat("----Model 2 Summary ---- \n")
+cat("MAE:", MAE(model2_predictions, validation_data[, 9]), "\n")
+cat("RMSE:", RMSE(model2_predictions, validation_data[, 9]), "\n")
+cat("ME:", ME(model2_predictions, validation_data[, 9]), "\n")
+cat("MPE:", MPE(model2_predictions, validation_data[, 9]), "\n")
+cat("MPAE", MAPE(model2_predictions, validation_data[, 9]), "\n")
+
+model3_predictions <- predict(validation_data[, 1:8], model3_weights)
+
+cat("----Model 3 Summary ----\n")
+cat("MAE:", MAE(model3_predictions, validation_data[, 9]), "\n")
+cat("RMSE:", RMSE(model3_predictions, validation_data[, 9]), "\n")
+cat("ME:", ME(model3_predictions, validation_data[, 9]), "\n")
+cat("MPE:", MPE(model3_predictions, validation_data[, 9]), "\n")
+cat("MPAE", MAPE(model3_predictions, validation_data[, 9]), "\n")
+
+model4_predictions <- predict(validation_data[, 1:8], model4_weights)
+
+cat("----Model 4 Summary ----\n")
+cat("MAE:", MAE(model4_predictions, validation_data[, 9]), "\n")
+cat("RMSE:", RMSE(model4_predictions, validation_data[, 9]), "\n")
+cat("ME:", ME(model4_predictions, validation_data[, 9]), "\n")
+cat("MPE:", MPE(model4_predictions, validation_data[, 9]), "\n")
+cat("MPAE", MAPE(model4_predictions, validation_data[, 9]), "\n")
+```
+
+We can see that all the models have approximately the same accuracy regardless the learning rate.
+
+Calculating the correlation between predicted strength and actual strength
+
+``` {r}
+
+cat("The correlation is :", cor(model1_predictions, validation_data[, 9]), "\n")
+```
+
+Plotting a lift chart 
+
+``` {r}
+# Create a temp data frame to calculate the sumulative strength
+temp <- data.frame("strength" = order(validation_data[, 9]))
+temp$cumstrength <- cumsum(temp$strength)
+temp$samples <- 1:dim(temp)[[1]]
+
+# Plot the lift chart
+ggplot(temp, aes(x = samples, y = cumstrength)) +
+  geom_line() +
+  labs(x = "Number of Samples", y = "Total Strength") +
+  ggtitle("Lift Chart")
+
+# Delete all environment variables
+rm(list = ls())
+```
+
 ---
