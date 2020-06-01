@@ -37,6 +37,7 @@ performance.
 library(dplyr)
 library(data.table)
 library(reshape2)
+library(car)
 library(MLmetrics)
 library(ggplot2)
 
@@ -367,4 +368,212 @@ rm(list = ls())
 
 # Problem 2
 
+• Read the included research article “Modeling Slump Flow Concrete”. It is sufficient to
+consider “Slump Flow” as the response variable in this problem just as in the included
+article.
 
+• Create a scatterplot matrix of “Concrete Slump Test Data” and select an initial set of
+predictor variables.
+
+• Build a few potential regression models using “Concrete Slump Test Data”
+
+• Perform regression diagnostics using both typical approach and enhanced approach
+
+• Identify unusual observations and take corrective measures
+
+• Select the best regression model
+
+• Fine tune the selection of predictor variables
+
+• Interpret the prediction results
+
+
+## In our opinion, it is sufficient to consider "Slump Flow" as the response variable because the slump flow is a function of the content of all concrete ingredients including cement, fly ash, blast furnace slag, water, superplasticizer, coarse aggregate, and fine aggregate. And since HPC is already so complicated to model, incorporating another response variable may overcomplicate the model hypothesis.
+
+
+``` {r}
+df <- readxl::read_xlsx("Concrete Slump Test Data.xlsx", sheet = "Concrete slump")
+df <- df[, 2:11]
+
+# Let's plot the scatterplot matrix
+scatterplotMatrix(df, main = "Scatterplot Matrix")
+
+
+# Since the above matrix is hard to interpret, we only plot it for a select
+# variables
+scatterplotMatrix(~ Cement + Slag + Water + SP + `Slump Flow`,
+  data = df,
+  main = "Scatterplot Matrix"
+)
+```
+
+Let's build a few regression models using these predictor variables 
+
+``` {r}
+fit1 <- lm(`Slump Flow` ~ Water + `Coarse Aggregate` + `Fine Aggregate`, data = df)
+
+summary(fit1)
+```
+
+``` {r}
+fit2 <- lm(`Slump Flow` ~ Water + Slag + `Fine Aggregate`, data = df)
+
+summary(fit2)
+```
+
+Let's try and fit a quadratic model
+
+``` {r}
+fit3 <- lm(`Slump Flow` ~ (Water^2) + Water + Slag, data = df)
+
+summary(fit3)
+```
+## Performing Regression Diagnostics using Typical Approach
+
+``` {r}
+
+# Model 1
+par(mfrow = c(2, 2))
+plot(fit1)
+
+# Model 2
+par(mfrow = c(2, 2))
+plot(fit2)
+
+# Model 3
+par(mfrow = c(2, 2))
+plot(fit3)
+```
+
+Model 3 seems to be the best fit. We can also see that points 41 and 69 appear to be influential. We can remove these two points from the data to see if the model fits better.
+
+``` {r}
+fit3 <- lm(`Slump Flow` ~ (Water^2) + Water + Slag, data = df[-c(41, 69), ])
+
+# Model 3
+par(mfrow = c(2, 2))
+plot(fit3)
+```
+
+The model seems to fit the data quite well. 
+
+## Peforming Diagnostic Regression with Enhanced Approach
+
+### Normality
+
+``` {r}
+fit <- lm(`Slump Flow` ~ Water + `Coarse Aggregate` + `Fine Aggregate`, data = df)
+
+qqPlot(fit, labels = rownames(df), id.method = "identify", simulate = TRUE, main = "QQ Plot")
+```
+
+We can see from the QQ Plot that our model satisfies normality. Almost all the points fall on the 45 degree line except for a few.
+
+
+### Independence of Errors
+
+``` {r}
+durbinWatsonTest(fit)
+```
+
+Since the p-value is insignificant, there is no autocorrelation and hence and independence of errors.
+
+
+### Linearity
+
+``` {r}
+crPlots(fit)
+```
+
+It seems that this model satisfies linearity.
+
+## Homoscedasticity
+
+``` {r}
+ncvTest(fit)
+spreadLevelPlot(fit)
+```
+
+From the insignificant p-value and the Spread-Level Plot we can see that the model meets the requirements for Homoscedasticity.
+
+## Unusual Observations and Corrective Measures
+
+``` {r}
+outlierTest(fit)
+```
+We can see that point 69 is an outlier. But the p-value is not significant and hence we can leave the model as it is.
+
+Let's search for High Leverage points
+
+``` {r}
+hat.plot <- function(fit) {
+  p <- length(coefficients(fit))
+  n <- length(fitted(fit))
+  plot(hatvalues(fit),
+    main = "Index Plot of Hat Values"
+  )
+  abline(h = c(2, 3) * p / n, col = "red", lty = 2)
+  identify(1:n, hatvalues(fit), names(hatvalues(fit)))
+}
+
+hat.plot(fit)
+```
+
+We can see that points 8, 12, 14, and 78 are unusual when it comes to their predicted values.
+
+## Influential Observations
+
+``` {r}
+cutoff <- 4 / (nrow(df) - length(fit$coefficients) - 2)
+plot(fit, which = 4, cook.levels = cutoff)
+abline(h = cutoff, lty = 2, col = "red")
+```
+
+
+``` {r}
+influencePlot(fit,
+  main = "Influence Plot",
+  sub = "Circle Size is proportional to Cook's distance"
+)
+```
+
+The plot shows that 41 and 14 are outliers. 8 and 14 have high leverage.  45, 41, 8 and 14 are influential observations.
+
+We remove points 41 and 14 as they are outliers as well as influential.
+
+``` {r}
+fit <- lm(`Slump Flow` ~ Water + `Coarse Aggregate` + `Fine Aggregate`, data = df[-c(14, 41), ])
+fit2 <- lm(`Slump Flow` ~ Water + Slag + `Coarse Aggregate` + `Fine Aggregate`, data = df[-c(14, 41), ])
+fit3 <- lm(`Slump Flow` ~ (Water^2) + Water + Slag, data = df[-c(14, 41), ])
+```
+
+## Selecting the best regression model
+
+``` {r}
+anova(fit2, fit)
+anova(fit2, fit3)
+
+AIC(fit, fit2, fit3)
+```
+
+The p-value test tells us that fit2 is better than fit since as the Slag predictor adds extra value to our model. However it is not better than fit3 model. 
+
+The AIC test also indicated that fit3 is the best model.
+
+## Let's interpret the results
+
+``` {r}
+summary(fit3)
+
+predictions <- predict(fit3, df)
+
+head(predictions)
+
+rm(list = ls())
+```
+
+
+We can infer from the model coefficients Water is the most important predictor in calculating the value of the Slump Flow. 1 kg per M cube change in Water results to 0.57 cm change in the Slump Flow. Slag is a less important predictor.
+
+
+---
