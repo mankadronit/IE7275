@@ -3,12 +3,12 @@ title: "Homework - 3"
 author: "Group 04"
 output:
   pdf_document: default
-  word_document: default
   html_notebook: default
+  word_document: default
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include=FALSE, warning = FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
 # Problem 1: Gradient Descent Algorithm for Multiple Linear Regression
@@ -38,6 +38,8 @@ library(dplyr)
 library(data.table)
 library(reshape2)
 library(car)
+library(readxl)
+library(lubridate)
 library(MLmetrics)
 library(moments)
 library(magrittr)
@@ -588,8 +590,7 @@ Importing Insurance dataset
 ```{r}
 insurance <- read.csv("insurance.csv", stringsAsFactors = TRUE)
 
-ins<- read.csv("insurance.csv", stringsAsFactors = TRUE)
-
+ins <- read.csv("insurance.csv", stringsAsFactors = TRUE)
 ```
 
 Summary Statistics
@@ -603,15 +604,16 @@ min(insurance$charges)
 
 max(insurance$charges)
 
-quantile(insurance$charges,0.25)
+quantile(insurance$charges, 0.25)
 
-quantile(insurance$charges,0.75)
+quantile(insurance$charges, 0.75)
 
 skewness(insurance$charges)
 
 kurtosis(insurance$charges)
 
-ggplot(insurance, aes(x=charges)) +geom_histogram(binwidth=1000)
+ggplot(insurance, aes(x = charges)) +
+  geom_histogram(binwidth = 1000)
 ```
 
 Interpretation- The summary statistics, namely the mean and median indicate skewness
@@ -625,15 +627,14 @@ the histogram reinforces the above my showing a left skewed distribution with a 
 
 attach(insurance)
 
-x<- cbind(age,BMI,children,charges)
+x <- cbind(age, BMI, children, charges)
 
 cor(x)
 
-scatterplotMatrix(x, spread=FALSE, col="blue", main="ScatterPlot Matrix")
+scatterplotMatrix(x, spread = FALSE, col = "blue", main = "ScatterPlot Matrix")
 
 
 detach(insurance)
-
 ```
 
 Interpretation- The scatter plot matrix shows a clear correlation between age-BMI, age-charges and BMI-charges. 
@@ -644,12 +645,11 @@ The values in correlation  are indicative of the same.
 
 ```{r }
 
-fit1<- lm(charges~., data=insurance)
+fit1 <- lm(charges ~ ., data = insurance)
 
 summary(fit1)
 
-6062/mean(insurance$charges)
-
+6062 / mean(insurance$charges)
 ```
 
 
@@ -672,9 +672,8 @@ the outcome has been explained by the regression model.
 
 ```{r }
 
-par(mfrow=c(2,2))
+par(mfrow = c(2, 2))
 plot(fit1)
-
 ```
 
 
@@ -696,8 +695,7 @@ we can barely see Cook’s distance lines because all cases are well inside of t
 ## Normality
 
 ```{r }
-qqPlot(fit1, labels=row.names(insurance),id.method="identify",simulate=TRUE, main="Q-Q Plot")
-
+qqPlot(fit1, labels = row.names(insurance), id.method = "identify", simulate = TRUE, main = "Q-Q Plot")
 ```
 
 
@@ -706,9 +704,8 @@ the normality assumption has not been met
 
 ## Linearity
 
-```{r warning = FALSE}
+```{r}
 crPlots(fit1)
-
 ```
 
 the component plus residual plots show that age, BMI and children meet the linearity assumption.
@@ -731,14 +728,14 @@ grouping BMI(adding an indicator for obesity- 1, normal- 0)
 adding a nonlinear term(quadratic) for age and performing MLR
 
 ```{r }
-ins$BMI<-findInterval(ins$BMI,c(0,30))
+ins$BMI <- findInterval(ins$BMI, c(0, 30))
 
-ins$BMI<-as.factor(ins$BMI)
+ins$BMI <- as.factor(ins$BMI)
 
-levels(ins$BMI)<-c(0,1)
+levels(ins$BMI) <- c(0, 1)
 
 
-fit2<- lm(charges ~ age + I(age^2) + sex + BMI + children + smoker + region, data = ins)
+fit2 <- lm(charges ~ age + I(age^2) + sex + BMI + children + smoker + region, data = ins)
 
 summary(fit2)
 
@@ -755,4 +752,241 @@ by approximately 6000 units in average which is 62 units less than the previous 
 
 - The adjusted R squared value of 0.7545 is greater that the previous model(0.7494) indicating that more 
 
-- Variability in the outcome has been explained by the model than the previous one.
+- Variability in the outcome has been explained by the model than the previous 
+
+---
+
+# Problem 4 - . Multiple Linear Regression Model for Forest Fire Data
+
+## Importing the dataset
+
+``` {r}
+Forest_Fires <- read_excel("Forest Fires Data.xlsx", sheet = "forestfires")
+```
+
+## Converting month and day to numerical variables
+
+``` {r warning = TRUE}
+
+Forest_Fires$month <- recode(Forest_Fires$Month,
+  "jan" = 1, "feb" = 2, "mar" = 3,
+  "apr" = 4, "may" = 5, "jun" = 6, "jul" = 7, "aug" = 8, "sep" = 9,
+  "oct" = 10, "nov" = 11, "dec" = 12
+)
+
+Forest_Fires$day <- recode(Forest_Fires$Day,
+  "sun" = 1, "mon" = 2, "tue" = 3,
+  "wed" = 4, "thu" = 5, "fri" = 6, "sat" = 7
+)
+
+
+
+Forest_Fires <- Forest_Fires[, -c(3, 4)]
+```
+
+Plot the scatterplot matrix
+
+```{r warning = FALSE}
+
+scatterplotMatrix(Forest_Fires, main = "Scatterplot Matrix")
+```
+
+Since the above matrix is hard to interpret, we only plot it for a select
+variables
+
+
+```{r}
+scatterplotMatrix(~ Wind + Temp + DMC + X + Y + month + day + `Area`,
+  data = Forest_Fires,
+  main = "Scatterplot Matrix"
+)
+```
+
+building a few regression models
+
+```{r}
+mod1 <- lm(Area ~ Wind + Temp + DMC + X + Y + month + day, data = Forest_Fires)
+
+summary(mod1)
+
+mod2 <- lm(Area ~ Wind + Temp + X + day, data = Forest_Fires)
+
+summary(mod2)
+
+mod3 <- lm(Area ~ Wind + I(Temp^2) + X + day, data = Forest_Fires)
+
+summary(mod3)
+
+mod4 <- lm(Area ~ log(Wind) + I(Temp^2) + X + day, data = Forest_Fires)
+
+summary(mod4)
+```
+
+## Performing Regression Diagnostics using Typical Approach
+
+```{r}
+
+# Model 1
+par(mfrow = c(2, 2))
+plot(mod1)
+
+
+# Model 2
+par(mfrow = c(2, 2))
+plot(mod2)
+
+
+# Model 3
+par(mfrow = c(2, 2))
+plot(mod3)
+
+
+# Model 4
+par(mfrow = c(2, 2))
+plot(mod4)
+```
+
+Model 4 seems to be the best fit though all the models including model 5 seem to satisfy the
+assumptions of Normality, Linearity and Homoscedasticity as depicted in the 
+Normal Q_Q, Residuals vs Fitted ans Scale-Location plots Respectively.
+We can also see that points 237 and 413 appear to be influential/outliers as shown in the Residuals vs Leverage. 
+We can remove these two points from the data to see if the model fits better.
+
+```{r}
+mod4_new <- lm(Area ~ log(Wind) + I(Temp^2) + X + day, data = Forest_Fires[-c(416, 239), ])
+
+# new Model 4
+par(mfrow = c(2, 2))
+plot(mod4_new)
+```
+
+## Peforming Diagnostic Regression with Enhanced Approach
+
+### Normality
+
+``` {r}
+
+qqPlot(mod4_new, labels = rownames(Forest_Fires), id.method = "identify", simulate = TRUE, main = "QQ Plot")
+```
+
+#We can see from the QQ Plot that our model satisfies normality. 
+#Almost all the points fall on the 45 degree line except for a few and most of them fall within the confidence Interval.
+
+
+
+## Linearity
+
+``` {r}
+crPlots(mod4_new)
+```
+
+Apparently this model satisfies linearity.
+
+### Homoscedasticity
+
+``` {r}
+ncvTest(mod4_new)
+spreadLevelPlot(mod4_new)
+```
+
+From the insignificant p-value and the Spread-Level Plot we can see that the model meets the requirements for Homoscedasticity.
+
+
+### Unusual Observations and Corrective Measures
+
+``` {r}
+outlierTest(mod4_new)
+```
+
+We can see that the point 478,238,237,236,419,377,235 are outliers.
+As the p-value is not significant and we can leave the model as it is.
+
+## High Leverage points
+
+``` {r}
+hat.plot <- function(mod4_new) {
+  p <- length(coefficients(mod4_new))
+  n <- length(fitted(mod4_new))
+  plot(hatvalues(mod4_new),
+    main = "Index Plot of Hat Values"
+  )
+  abline(h = c(2, 3) * p / n, col = "red", lty = 2)
+  identify(1:n, hatvalues(mod4_new), names(hatvalues(mod4_new)))
+}
+hat.plot(mod4_new)
+```
+
+We can see that points 249, 291, 464 and 483 are unusual when it comes to their predicted values.
+
+
+### Influential Observations
+
+``` {r}
+cutoff <- 4 / (nrow(df) - length(mod4_new$coefficients) - 2)
+plot(mod4_new, which = 4, cook.levels = cutoff)
+abline(h = cutoff, lty = 2, col = "red")
+```
+
+
+the Cook's Distance graph shows that 237,236,478 are influential.
+
+``` {r}
+influencePlot(mod4_new,
+  main = "Influence Plot",
+  sub = "Circle Size is proportional to Cook's distance"
+)
+```
+
+The Influence plot shows that 237,238 and 478 are outliers and also highly influential observations.
+
+We remove points 237,238 and 478 as they are outliers as well as influential.
+
+``` {r}
+
+mod1 <- lm(Area ~ Wind + Temp + DMC + X + Y + month + day, data = Forest_Fires[-c(237, 238, 478), ])
+
+
+mod2 <- lm(Area ~ Wind + Temp + X + day, data = Forest_Fires[-c(237, 238, 478), ])
+
+
+mod3 <- lm(Area ~ Wind + I(Temp^2) + X + day, data = Forest_Fires[-c(237, 238, 478), ])
+
+
+mod4 <- lm(Area ~ log(Wind) + I(Temp^2) + X + day, data = Forest_Fires[-c(237, 238, 478), ])
+
+
+mod5 <- lm(Area ~ I(Temp^2) + I(X^1.3) + I(day^10), data = Forest_Fires[-c(237, 238, 478), ])
+```
+
+## Selecting the best regression model
+
+``` {r}
+anova(mod2, mod1)
+
+AIC(mod1, mod2, mod3, mod4)
+```
+
+As only model 1 and 2 are nested models the anova funcion is used on them.
+The insignificant P value indicated that the excess predicitors in  the pairs 
+dont add to the linear predictions so we are better off dropping them
+i.e model 2 is the best among the pair
+
+The AIC test indicated that model 4 is the best among them all.
+
+Let's interpret the results
+
+``` {r}
+summary(mod4)
+prediction <- predict(mod4, Forest_Fires)
+head(prediction)
+
+rm(list = ls())
+```
+
+
+Interpretation
+
+The R squared and the adjusted R squared values are very low for all the linear regression models indicating its not the best fit for this data set. It can also be seen that the predicter "Temperature" plays a major role in predicting the area of forest fires 
+RSE- 62.15, meaning that the predicted Area deviates from the actual values 
+by approximately 62 units on average 
+---
