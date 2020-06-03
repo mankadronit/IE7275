@@ -39,6 +39,8 @@ library(data.table)
 library(reshape2)
 library(car)
 library(MLmetrics)
+library(moments)
+library(magrittr)
 library(ggplot2)
 
 # Read the csv file
@@ -577,3 +579,180 @@ We can infer from the model coefficients Water is the most important predictor i
 
 
 ---
+
+# Problem 3
+
+
+Importing Insurance dataset
+
+```{r}
+insurance <- read.csv("insurance.csv", stringsAsFactors = TRUE)
+
+ins<- read.csv("insurance.csv", stringsAsFactors = TRUE)
+
+```
+
+Summary Statistics
+
+```{r }
+mean(insurance$charges)
+
+median(insurance$charges)
+
+min(insurance$charges)
+
+max(insurance$charges)
+
+quantile(insurance$charges,0.25)
+
+quantile(insurance$charges,0.75)
+
+skewness(insurance$charges)
+
+kurtosis(insurance$charges)
+
+ggplot(insurance, aes(x=charges)) +geom_histogram(binwidth=1000)
+```
+
+Interpretation- The summary statistics, namely the mean and median indicate skewness
+in the dependent variable and the skewness of 1.51418 tells us that it is highly skewed
+the kurtosis value of 4.6 tells us that the data has a heavier tail than the normal distribution.
+the histogram reinforces the above my showing a left skewed distribution with a heavy right tail.
+
+## Let's plot the scatterplot matrix
+
+```{r warning = FALSE}
+
+attach(insurance)
+
+x<- cbind(age,BMI,children,charges)
+
+cor(x)
+
+scatterplotMatrix(x, spread=FALSE, col="blue", main="ScatterPlot Matrix")
+
+
+detach(insurance)
+
+```
+
+Interpretation- The scatter plot matrix shows a clear correlation between age-BMI, age-charges and BMI-charges. 
+
+The values in correlation  are indicative of the same.
+
+## Building Regression model
+
+```{r }
+
+fit1<- lm(charges~., data=insurance)
+
+summary(fit1)
+
+6062/mean(insurance$charges)
+
+```
+
+
+Evaluation
+- The RSE = 6062, meaning that the observed medical charges deviate from the predicted values 
+by approximately 6062 units in average. 
+
+- This corresponds to an error rate of 6062/mean(insurance$charges)= 45%
+
+- The adjusted R squared value of 0.7494 indicates that a large proportion of the variability in 
+the outcome has been explained by the regression model.
+
+- A large F-statistic of 500.8 producing a p-value (p < 0.05) of 2.2e-16, is highly significant.
+
+
+
+## Regression Diagnostics
+
+## Typical approach
+
+```{r }
+
+par(mfrow=c(2,2))
+plot(fit1)
+
+```
+
+
+- Normality- The normal Q-Q plot shows that the normality assumption of the dependent variable 
+has been violated since the points dont fall on the 45 degree line
+
+- Linearity- The residuals versus fitted graph shows the presence of a
+curved relationship between the residuals and the fitted values.
+
+- Homoscedasticity-The Scale-location plot shows if residuals are spread equally along the ranges 
+of predictors but here that does not seem to be the case as the spread does not look uniform accross 
+all the predictors. The model doesnt seem to have meet this assumption.
+
+- Outliers- The residuals vs leverage plot shows that there is no influential case, or cases. 
+we can barely see Cook’s distance lines because all cases are well inside of the Cook’s distance lines.
+
+## Enhanced Approach
+
+## Normality
+
+```{r }
+qqPlot(fit1, labels=row.names(insurance),id.method="identify",simulate=TRUE, main="Q-Q Plot")
+
+```
+
+
+most of the points dont fall close to the line and inside the confidence interval suggesting that
+the normality assumption has not been met
+
+## Linearity
+
+```{r warning = FALSE}
+crPlots(fit1)
+
+```
+
+the component plus residual plots show that age, BMI and children meet the linearity assumption.
+
+## Homoscedasticity
+
+```{r }
+ncvTest(fit1)
+
+spreadLevelPlot(fit1)
+```
+
+the suggested power transformation and the non horizontal line in spread level plot indicate that the 
+
+Homoscedasticity assumption has been violated
+
+
+
+grouping BMI(adding an indicator for obesity- 1, normal- 0)
+adding a nonlinear term(quadratic) for age and performing MLR
+
+```{r }
+ins$BMI<-findInterval(ins$BMI,c(0,30))
+
+ins$BMI<-as.factor(ins$BMI)
+
+levels(ins$BMI)<-c(0,1)
+
+
+fit2<- lm(charges ~ age + I(age^2) + sex + BMI + children + smoker + region, data = ins)
+
+summary(fit2)
+
+rm(list = ls())
+```
+
+Comparison to the previous model
+
+Evaluation
+
+- The RSE = 6000, meaning that the observed medical charges deviate from the predicted values 
+by approximately 6000 units in average which is 62 units less than the previous model 
+
+
+- The adjusted R squared value of 0.7545 is greater that the previous model(0.7494) indicating that more 
+
+- Variability in the outcome has been explained by the model than the previous one.
