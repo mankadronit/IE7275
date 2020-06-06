@@ -25,6 +25,7 @@ information in the first 13 columns. Partition the data into training (60%) and 
 # Import the required packages
 library(dplyr)
 library(readxl)
+library(e1071)
 library(FNN)
 library(caret)
 
@@ -42,7 +43,7 @@ df.norm <- as.data.frame(lapply(BostonHousing[1:13], normalize))
 # Generate the training data indices
 indices <- sample(seq_len(nrow(df.norm)), size = floor(0.6 * nrow(df.norm)))
 
-# Get training and validation data 
+# Get training and validation data
 train_data <- df.norm[indices, ]
 validation_data <- df.norm[-indices, ]
 
@@ -122,4 +123,210 @@ For each record in the dataset, the algorithm -
    - If it is a classification problem, it takes the classes of each of the K neighbors and assigns the majority class to the current record.
    - If it is a regression problem, it takes the average of the output variable of each of the K neighbors and assigns it to the current record.
    
+---
+
+# Problem 3
+
+The file Accidents.xlsx contains information on 42,183 actual automobile accidents
+in 2001 in the United States that involved one of three levels of injury: NO INJURY,
+INJURY, or FATALITY. For each accident, additional information is recorded, such as
+day of week, weather conditions, and road type. A firm might be interested in 
+developing a system for quickly classifying the severity of an accident based on initial
+reports and associated data in the system (some of which rely on GPS-assisted
+reporting).
+Our goal here is to predict whether an accident just reported will involve an injury
+(MAX_SEV_IR = 1 or 2) or will not (MAX_SEV_IR = 0). For this purpose, create a
+dummy variable called INJURY that takes the value "yes" if MAX_SEV_IR = 1 or 2, and
+otherwise "no."
+
+
+## (a) Using the information in this dataset, if an accident has just been reported and no
+further information is available, what should the prediction be? (INJURY = Yes or No?) Why?
+
+``` {r}
+# Import Accidents.xlsx
+Accidents <- read_xlsx("Accidents.xlsx", sheet = "Data")
+
+Accidents$INJURY <- Accidents$MAX_SEV_IR
+Accidents <- Accidents %>%
+  mutate_at(
+    .vars = "INJURY",
+    .funs = c(function(x) ifelse(x == "1" | x == "2", "Yes", "No"))
+  )
+Accidents$INJURY <- as.factor(Accidents$INJURY)
+
+# Look at the summary of Injury
+summary(Accidents$INJURY)
+```
+
+Using the Naive Rule, we would predict a new accident to have an injury involved since INJURY = "yes" is more common than "no".
+
+## (b) Select the first 12 records in the dataset and look only at the response (INJURY) and
+the two predictors WEATHER_R and TRAF_CON_R.
+
+i. Using Excel tools create a pivot table that examines INJURY as a function of
+the 2 predictors for these 12 records. Use all 3 variables in the pivot table as
+rows/columns, and use counts for the cells.
+
+
+``` {r}
+# Select the required columns and the 12 records
+df <- select(Accidents, c("WEATHER_R", "TRAF_CON_R", "INJURY"))[1:12, ]
+
+# Create the pivot table
+pivot_table <- as.data.frame(table(df$WEATHER_R, df$TRAF_CON_R, df$INJURY,
+  dnn = c("WEATHER_R", "TRAF_CON_R", "INJURY")
+))
+
+print(pivot_table)
+```
+
+ii. Compute the exact Bayes conditional probabilities of an injury (INJURY =Yes)
+given the six possible combinations of the predictors.
+
+``` {r}
+# Function to calculate probability manually
+calculate_prob <- function(weather_r, traf_con_r) {
+  filter(pivot_table, WEATHER_R == weather_r & TRAF_CON_R == traf_con_r & INJURY == "Yes")$Freq /
+    sum(filter(pivot_table, WEATHER_R == weather_r & TRAF_CON_R == traf_con_r)$Freq)
+}
+
+
+cat("P(INJURY = Yes | WEATHER_R = 1, TRAF_CON_R = 0):", calculate_prob(1, 0), "\n")
+cat("P(INJURY = Yes | WEATHER_R = 2, TRAF_CON_R = 0):", calculate_prob(2, 0), "\n")
+cat("P(INJURY = Yes | WEATHER_R = 1, TRAF_CON_R = 1):", calculate_prob(1, 1), "\n")
+cat("P(INJURY = Yes | WEATHER_R = 2, TRAF_CON_R = 1):", calculate_prob(2, 1), "\n")
+cat("P(INJURY = Yes | WEATHER_R = 1, TRAF_CON_R = 2):", calculate_prob(1, 2), "\n")
+cat("P(INJURY = Yes | WEATHER_R = 2, TRAF_CON_R = 2):", calculate_prob(2, 2), "\n")
+```
+
+iii. Classify the 12 accidents using these probabilities and a cutoff of 0.5.
+
+
+Since the cutoff is 0.5, the only combination of attributes that has probability greater than 0.5 is when WEATHER_R = 1 and TRAF_CON_R = 0
+
+``` {r}
+# add a predictions column
+df <- df %>%
+  mutate(predictions = ifelse(WEATHER_R == 1 & TRAF_CON_R == 0, "Yes", "No"))
+
+cat("The predictions are: \n")
+print(df)
+```
+
+iv. Compute manually the naive Bayes conditional probability of an injury given
+WEATHER_R = 1 and TRAF_CON_R = 1.
+
+By looking at the pivot table, we can calculate P(INJURY = Yes | WEATHER_R = 1, TRAF_CON_R = 1)
+
+``` {r}
+# Manually calculate the probability
+prob <- ((3 / 12) * ((2 / 3) * (0 / 3))) / (((3 / 12) * ((2 / 3) * (0 / 3))) + ((9 / 12) * ((3 / 9) * (2 / 9))))
+
+cat("P(INJURY = Yes | WEATHER_R = 1, TRAF_CON_R = 1):", prob, "\n")
+```
+
+
+v. Run a naive Bayes classifier on the 12 records and 2 predictors. Obtain
+probabilities and classifications for all 12 records. Compare this to the exact
+Bayes classification. Are the resulting classifications equivalent? Is the
+ranking (= ordering) of observations equivalent?
+
+``` {r}
+# Train the Naive Bayes Classifier
+nb <- naiveBayes(INJURY ~ WEATHER_R + TRAF_CON_R, data = df[, 1:3])
+
+pred.prob <- predict(nb, newdata = df[, 1:3], type = "raw")
+
+pred.class <- data.frame(ifelse(pred.prob[, 1] - pred.prob[2] < 0, "Yes", "No"))
+colnames(pred.class) <- "class"
+
+actual_vs_predicted <- data.frame("actual" = df$INJURY, "predicted" = pred.class$class)
+actual_vs_predicted$exact_bayes <- df$predictions
+actual_vs_predicted$no_prob <- pred.prob[, 1]
+actual_vs_predicted$yes_prob <- pred.prob[, 2]
+
+cat("Actual vs Predicted Probabilities are: \n")
+print(actual_vs_predicted)
+```
+The resulting classifications of the Naive Bayes Classifier and the Exact Bayes classifier are equivalent. Their ranking and ordering is also equivalent.
+
+## (c) Let us now return to the entire dataset. Partition the data into training/validation sets.
+
+i. Assuming that no information or initial reports about the accident itself are
+available at the time of prediction (only location characteristics, weather
+conditions, etc.), which predictors can we include in the analysis? (Use the 
+Data_Codes sheet.)
+
+If no information about the accident itself is available, we can include these predictor in the analysis - HOUR_I_R, ALIGN_R, WRK_ZONE, WKDY_I_R, INT_HWY, LIGHTCON_I_R, REL_RWY_R, SPD_LIM, SUR_CON, TRAF_CON_R,  WEATHER_R.
+
+``` {r}
+# Generate the training data indices
+df <- Accidents[, c(1, 3, 5, 6, 7, 8, 11, 12, 14, 15, 16, 20, 25)]
+indices <- sample(seq_len(nrow(df)), size = floor(0.6 * nrow(df)))
+
+# Get training and validation data
+train_data <- df[indices, ]
+validation_data <- df[-indices, ]
+```
+
+
+ii. Run a naive Bayes classifier on the complete training set with the relevant
+predictors (and INJURY as the response). Note that all predictors are
+categorical. Show the classification matrix.
+
+``` {r}
+nb <- naiveBayes(INJURY ~ ., train_data)
+
+pred.class <- predict(nb, newdata = train_data)
+
+cat("The Classification Matrix is :\n")
+confusionMatrix(data = pred.class, reference = train_data$INJURY)
+```
+
+iii. What is the overall error for the validation set?
+
+``` {r}
+pred.class <- predict(nb, newdata = validation_data)
+
+cf <- confusionMatrix(data = pred.class, reference = validation_data$INJURY)
+
+cat("The error rate is :", paste0(round(100 * (1 - cf$overall[[1]]), 4), "%"), "\n")
+```
+
+iv. What is the percent improvement relative to the naive rule (using the validation set)?
+
+``` {r message = FALSE, warning = FALSE}
+naive_cf <- confusionMatrix(
+  data = as.factor(rep("Yes", dim(validation_data)[[1]])),
+  reference = validation_data$INJURY
+)
+
+cat(
+  "The difference between the Naive Bayes Classifier accuracy and the Naive Rule accuracy is:",
+  paste0(round(100 * (cf$overall[[1]] - naive_cf$overall[[1]]), 4), "%"), "\n"
+)
+```
+
+v. Examine the conditional probabilities output. Why do we get a probability of
+zero for P(INJURY = No | SPD_LIM = 5)?
+
+``` {r}
+pivot_table <- as.data.frame(table(validation_data$INJURY, validation_data$SPD_LIM,
+  dnn = c("INJURY", "SPD_LIM")
+))
+
+
+cat(
+  "P(INJURY = No | SPD_LIM = 5):",
+  filter(pivot_table, SPD_LIM == 5 & INJURY == "No")$Freq /
+    sum(filter(pivot_table, SPD_LIM == 5)$Freq)
+)
+
+
+rm(list = ls())
+```
+
+The entire dataset of nearly 17000 records has only one case with INJURY = No and SPD_LIM = 5 so the probability is approximately 0.
+
 ---
