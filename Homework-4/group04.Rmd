@@ -9,6 +9,185 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+``` {r}
+# Import the required packages
+library(dplyr)
+library(readxl)
+library(e1071)
+library(FNN)
+library(class)
+library(modelr)
+library(caret)
+```
+
+# Problem 1: Personal Loan Acceptance
+
+The file UniversalBank.xlsx contains data on 5000 customers. The data include
+customer demographic information (age, income, etc.), the customer's relationship with
+the bank (mortgage, securities account, etc.), and the customer response to the last
+personal loan campaign (Personal Loan). Among these 5000 customers, only 480(= 9.6%)
+accepted the personal loan that was offered to them in the earlier campaign.
+Partition the data into training (60%) and validation (40%) sets.
+
+Importing the dataset
+
+```{r}
+universal <- read_xlsx("UniversalBank.xlsx", sheet = "Data")
+
+test.df <- data.frame(
+  Education1 = 0, Education2 = 1, Education3 = 0, Age = 40, Experience = 10, Income = 84, Family = 2,
+  CCAvg = 2, Mortgage = 0, Personal.Loan = "", `Securities Account` = 0,
+  `CD Account` = 0, Online = 1, Creditcard = 1
+)
+```
+
+
+Creating Dummy variables for Education type
+
+```{r}
+attach(universal)
+
+X <- universal[, 8]
+
+
+X$Education <- paste0("Education", X$Education)
+mm <- model.matrix(~ . + 0, data = X)
+colnames(mm) <- c("Education1", "Education2", "Education3")
+
+universal <- cbind(mm, universal[, -8])
+
+detach(universal)
+```
+
+Normalizing
+
+```{r}
+
+train.index <- sample(rownames(universal), 0.6 * dim(universal)[1])
+valid.index <- setdiff(rownames(universal), train.index)
+
+train.df <- universal[train.index, -c(4, 8)]
+valid.df <- universal[valid.index, -c(4, 8)]
+
+train.norm.df <- train.df
+valid.norm.df <- valid.df
+universal.norm.df <- universal[, -c(4, 8)]
+
+norm.values <- preProcess(train.df[, -10], method = c("center", "scale"))
+train.norm.df <- predict(norm.values, train.df)
+valid.norm.df <- predict(norm.values, valid.df)
+universal.norm.df <- predict(norm.values, universal[, -c(4, 8)])
+
+colnames(test.df) <- colnames(universal[, -c(4, 8)])
+
+test.norm.df <- predict(norm.values, test.df)
+```
+
+Performing Knn
+
+```{r}
+KN <- knn(train = train.norm.df[, -10], test = test.norm.df[, -10], cl = train.norm.df[, 10], k = 1)
+row.names(train.df)[attr(KN, "KN.index")]
+
+KN
+```
+
+Interpretation- As apparent in the result this customer is classified as class 0(non loan acceptence)
+for a default cutoff value of 0.5.
+
+
+## (b) - predicting the choice of k that balances between overfitting and ignoring the predictor information
+
+Computing Knn for different k values on validation set
+
+```{r}
+accuracy.df <- data.frame(k = seq(1, 20), accuracy = rep(0, 20))
+
+valid.norm.df[, 10] <- as.factor(valid.norm.df[, 10])
+
+
+for (i in 1:20) {
+  knn.pred <- knn(train.norm.df[, -10], valid.norm.df[, -10], cl = train.norm.df[, 10], k = i)
+  accuracy.df[i, 2] <- confusionMatrix(knn.pred, valid.norm.df[, 10])$overall[1]
+}
+
+max(accuracy.df[, 2])
+```
+
+as we can see the maximun accuracy(0.9655) is achieved with a k value of 3
+
+## (c)
+
+```{r}
+KN1 <- knn(train.norm.df[, -10], valid.norm.df[, -10], cl = train.norm.df[, 10], k = 3)
+
+valid.predict <- confusionMatrix(KN1, valid.norm.df[, 10])
+
+valid.predict
+```
+
+## (d) the given customer is same as the one in question 1 classifing the customer using k=3
+
+```{r}
+KN2 <- knn(train = train.norm.df[, -10], test = test.norm.df[, -10], cl = train.norm.df[, 10], k = 3)
+row.names(train.df)[attr(KN, "KN.index")]
+
+KN2
+```
+As apparent in the result this customer is classified as class 0(non loan acceptence)
+
+
+## (e)
+Repartitioning the data into training, validation, and test sets (50% : 30% :20%)
+
+```{r}
+train.index1 <- sample(rownames(universal), 0.5 * dim(universal)[1])
+index1 <- setdiff(rownames(universal), train.index1)
+valid.index1 <- sample(rownames(universal[index1, ]), 0.6 * dim(universal[index1, ])[1])
+test.index1 <- setdiff(rownames(universal[index1, ]), valid.index1)
+
+train.df1 <- universal[train.index1, -c(4, 8)]
+valid.df1 <- universal[valid.index1, -c(4, 8)]
+test.df1 <- universal[test.index1, -c(4, 8)]
+```
+
+normalizing the data 
+
+```{r}
+train.norm.df1 <- train.df1
+valid.norm.df1 <- valid.df1
+test.norm.df1 <- test.df1
+
+train.norm.df1 <- predict(norm.values, train.df1)
+valid.norm.df1 <- predict(norm.values, valid.df1)
+test.norm.df1 <- predict(norm.values, test.df1)
+
+test.norm.df1[, 10] <- as.factor(test.norm.df1[, 10])
+```
+
+performing Knn for test set with training and validation sets
+
+```{r}
+KN3 <- knn(train.norm.df1[, -10], test.norm.df1[, -10], cl = train.norm.df1[, 10], k = 3)
+
+KN4 <- knn(valid.norm.df1[, -10], test.norm.df1[, -10], cl = valid.norm.df1[, 10], k = 3)
+
+
+test.predict1 <- confusionMatrix(KN3, test.norm.df1[, 10])
+
+test.predict2 <- confusionMatrix(KN4, test.norm.df1[, 10])
+
+test.predict1
+
+test.predict2
+```
+
+interpretation- As it can be seen better accuracy in prediction(1-0.966,2-0.956)  was achieved when the training data set was larger.
+in the 1st case 2500 objects were used as training data whereas in the 2nd part 1500 were used.
+Hence it is safe to say that the prediction gets better with the best value of K and larger training sample.
+
+
+
 # Problem 2: Predicting Housing Median Prices k-NN
 
 The file BostonHousing.xlsx contains information on over 500 census tracts in
@@ -21,13 +200,6 @@ information in the first 13 columns. Partition the data into training (60%) and 
 
 ## (a) Perform a k-NN prediction with all 13 predictors (ignore the CAT.MEDV column), trying values of k from 1 to 5. Make sure to normalize the data (click "normalize input data"). What is the best k chosen? What does it mean?
 ``` {r warning = FALSE, message = FALSE}
-
-# Import the required packages
-library(dplyr)
-library(readxl)
-library(e1071)
-library(FNN)
-library(caret)
 
 # Import the BostonHousing.xlsx file
 BostonHousing <- read_xlsx("BostonHousing.xlsx", sheet = "Data")
