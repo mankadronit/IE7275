@@ -4,6 +4,7 @@ library(psych)
 library(caret)
 library(FNN)
 library(ISLR)
+library(tree)
 library(e1071)
 library(ggplot2)
 
@@ -98,7 +99,7 @@ cat(
 )
 
 # Add to performance list
-performance_list[1, ] <- c("KNN", knn_accuracy)
+performance_list[1, ] <- c("KNN (PCA)", knn_accuracy)
 
 rm(list = c("k", "knn.pred", "knn_accuracy", "cf"))
 
@@ -126,7 +127,7 @@ cat("Accuracy of Logistic Regression Model with PCA:", paste0(logistic_accuracy.
 cat("Accuracy of Logistic Regression Model:", paste0(logistic_accuracy, "%"), "\n")
 
 
-performance_list[dim(performance_list)[[1]] + 1, ] <- c("Logistic Regression with PCA", logistic_accuracy.pc)
+performance_list[dim(performance_list)[[1]] + 1, ] <- c("Logistic Regression (PCA)", logistic_accuracy.pc)
 performance_list[dim(performance_list)[[1]] + 1, ] <- c("Logistic Regression", logistic_accuracy)
 
 rm(list = c("glm.fit", "glm.pred", "glm.probs", "logistic_accuracy", "cf",
@@ -143,8 +144,39 @@ cf <- confusionMatrix(table(pred.class, validation_data$CLASS_LABEL))
 nb_accuracy <- 100 * cf$overall[[1]]
 cat("Accuracy of Naive Bayes Model:", paste0(nb_accuracy, "%"), "\n")
 
-performance_list[dim(performance_list)[[1]] + 1, ] <- c("Naive Bayes", nb_accuracy)
+performance_list[dim(performance_list)[[1]] + 1, ] <- c("Naive Bayes (PCA)", nb_accuracy)
 
 rm(list = c("nb", "cf", "pred.class", "nb_accuracy"))
 
+#######################
+## Implementing Decision Tree
+# Classification tree on PCA Dataset
+tree.pca <- tree(CLASS_LABEL ~ ., data = train_data)
+plot(tree.pca)
+text(tree.pca, pretty = 0)
+
+tree.pca.pred <- predict(tree.pca, validation_data, type = "class")
+cf.pca <- confusionMatrix(tree.pca.pred, validation_data$CLASS_LABEL)
+
+# Classification tree on Original Dataset
+tree <- tree(CLASS_LABEL ~ ., data = df.norm[indices, ])
+plot(tree)
+text(tree, pretty = 0)
+
+tree.pred <- predict(tree, df.norm[-indices, ], type = "class")
+cf <- confusionMatrix(tree.pred, df.norm[-indices, ]$CLASS_LABEL)
+
+tree_pca_accuracy <- 100 * cf.pc$overall[[1]]
+tree_accuracy <- 100 * cf$overall[[1]]
+
+cat("Accuracy of Decision Tree (PCA):", paste0(tree_pca_accuracy, "%"), "\n")
+cat("Accuracy of Decision Tree:", paste0(tree_accuracy, "%"), "\n")
+
+performance_list[dim(performance_list)[[1]] + 1, ] <- c("Decision Tree (PCA)", tree_pca_accuracy)
+performance_list[dim(performance_list)[[1]] + 1, ] <- c("Decision Tree", tree_accuracy)
+
+rm(list = c("tree.pca", "tree.pca.pred", "cf.pca", "tree", 
+            "tree.pred", "cf", "tree_pca_accuracy", "tree_accuracy"))
+
+#######################
 ##############################################################
