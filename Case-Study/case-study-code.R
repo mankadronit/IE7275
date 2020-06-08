@@ -5,6 +5,7 @@ library(caret)
 library(FNN)
 library(ISLR)
 library(tree)
+library(randomForest)
 library(e1071)
 library(ggplot2)
 
@@ -179,4 +180,30 @@ rm(list = c("tree.pca", "tree.pca.pred", "cf.pca", "tree",
             "tree.pred", "cf", "tree_pca_accuracy", "tree_accuracy"))
 
 #######################
+## Implementing Random Forests
+
+# On PCA dataset
+rf.pca <- randomForest(CLASS_LABEL ~ ., data = train_data)
+rf.pca.pred <- predict(rf.pca, validation_data)
+cf.pca <- confusionMatrix(rf.pca.pred, validation_data$CLASS_LABEL)
+
+
+rf_pca_accuracy <- 100 * cf.pca$overall[[1]]
+
+# On original dataset
+rf <- randomForest(CLASS_LABEL ~ ., data = df.norm[indices, ])
+rf.pred <- predict(rf, df.norm[-indices, ])
+cf <- confusionMatrix(rf.pred, df.norm[-indices, ]$CLASS_LABEL)
+
+
+rf_accuracy <- 100 * cf$overall[[1]]
+
+cat("Accuracy of Random Forests (PCA):", paste0(rf_pca_accuracy, "%"), "\n")
+cat("Accuracy of Random Forests:", paste0(rf_accuracy, "%"), "\n")
+
+performance_list[dim(performance_list)[[1]] + 1, ] <- c("Random Forests (PCA)", rf_pca_accuracy)
+performance_list[dim(performance_list)[[1]] + 1, ] <- c("Random Forests", rf_accuracy)
+
+rm(list = c("rf.pca", "rf.pca.pred", "cf.pca", "rf", 
+            "rf.pred", "cf", "rf_accuracy", "rf_pca_accuracy"))
 ##############################################################
