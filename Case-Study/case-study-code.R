@@ -71,7 +71,6 @@ train_data <- pc[indices, ]
 validation_data <- pc[-indices, ]
 
 
-rm(list = c("indices", "df.norm", "pc", "df"))
 
 # Creating a performance list for each algorithm
 performance_list <- data.frame("Model" = NA, "Accuracy" = NA)
@@ -86,8 +85,10 @@ knn.pred <- knn(train = train_data[, 1:13],
                 cl = train_data$CLASS_LABEL, 
                 k = k)
 
+knn.pred
 cf <- confusionMatrix(knn.pred, validation_data$CLASS_LABEL)
 
+cf
 # Get the K-value with the highest accuracy
 knn_accuracy <- 100 * cf$overall[[1]]
 
@@ -103,21 +104,33 @@ rm(list = c("k", "knn.pred", "knn_accuracy", "cf"))
 
 #######################
 ## Implementing Logistic Regression
-glm.fit <- glm(CLASS_LABEL ~ ., data = train_data, family = binomial)
+glm.fit.pc <- glm(CLASS_LABEL ~ ., data = train_data, family = binomial)
 
-summary(glm.fit)
 
-glm.probs <- predict(glm.fit, newdata = validation_data, type = "response")
+glm.probs.pc <- predict(glm.fit.pc, newdata = validation_data, type = "response")
+glm.pred.pc <- ifelse(glm.probs.pc > 0.5, 1, 0)
+
+cf.pc <- confusionMatrix(table(glm.pred.pc, validation_data$CLASS_LABEL))
+
+glm.fit <- glm(CLASS_LABEL ~ ., data = df.norm[indices, ], family = binomial)
+
+
+glm.probs <- predict(glm.fit, newdata = df.norm[-indices, ], type = "response")
 glm.pred <- ifelse(glm.probs > 0.5, 1, 0)
 
-cf <- confusionMatrix(table(glm.pred, validation_data$CLASS_LABEL))
+cf <- confusionMatrix(table(glm.pred, df.norm[-indices, ]$CLASS_LABEL))
 
+logistic_accuracy.pc <- 100 * cf.pc$overall[1]
 logistic_accuracy <- 100 * cf$overall[1]
+cat("Accuracy of Logistic Regression Model with PCA:", paste0(logistic_accuracy.pc, "%"), "\n")
 cat("Accuracy of Logistic Regression Model:", paste0(logistic_accuracy, "%"), "\n")
 
+
+performance_list[dim(performance_list)[[1]] + 1, ] <- c("Logistic Regression with PCA", logistic_accuracy.pc)
 performance_list[dim(performance_list)[[1]] + 1, ] <- c("Logistic Regression", logistic_accuracy)
 
-rm(list = c("glm.fit", "glm.pred", "glm.probs", "logistic_accuracy", "cf"))
+rm(list = c("glm.fit", "glm.pred", "glm.probs", "logistic_accuracy", "cf",
+            "glm.fit.pc", "glm.pred.pc", "glm.probs.pc", "logistic_accuracy.pc", "cf.pc"))
 
 #######################
 ## Implementing Naive Bayes
