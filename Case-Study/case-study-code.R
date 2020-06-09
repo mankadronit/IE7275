@@ -6,15 +6,14 @@ library(FNN)
 library(ISLR)
 library(tree)
 library(randomForest)
+library(neuralnet)
 library(e1071)
 library(ggplot2)
 
 # Load phishing_websites.csv
-df <- read.csv("./data/phishing_websites.csv")
+df <- data.frame(read.csv("./data/phishing_websites.csv"))
 # Remove "HttpsInHostname" column
 df <- df[, !colnames(df) %in% c("HttpsInHostname")]
-df$CLASS_LABEL <- as.factor(df$CLASS_LABEL)
-
 ##############################################################
 ## Data Visualization
 
@@ -44,7 +43,8 @@ normalize <- function(x) {
 }
 
 # Normalize the dataframe
-df.norm <- cbind(as.data.frame(lapply(df[1:47], normalize)), df$CLASS_LABEL) %>%
+df.norm <- as.data.frame(cbind(as.data.frame(lapply(df[1:47], normalize)), 
+                               df$CLASS_LABEL)) %>%
   rename(CLASS_LABEL = "df$CLASS_LABEL")
 
 
@@ -72,7 +72,9 @@ indices <- sample(seq_len(nrow(pc)), size = floor(0.6 * nrow(pc)))
 train_data <- pc[indices, ]
 validation_data <- pc[-indices, ]
 
-
+# Also keep a set of train and validation sets without PCA
+df.norm.train <- as.data.frame(lapply(df.norm[indices, ], as.numeric))
+df.norm.validation <- as.data.frame(lapply(df.norm[-indices, ], as.numeric))
 
 # Creating a performance list for each algorithm
 performance_list <- data.frame("Model" = NA, "Accuracy" = NA)
@@ -206,4 +208,26 @@ performance_list[dim(performance_list)[[1]] + 1, ] <- c("Random Forests", rf_acc
 
 rm(list = c("rf.pca", "rf.pca.pred", "cf.pca", "rf", 
             "rf.pred", "cf", "rf_accuracy", "rf_pca_accuracy"))
+
+#######################
+## Implementing Artificial Neural Networks
+# On PCA Dataset
+nn.pca <- neuralnet(CLASS_LABEL ~ ., data = train_data, hidden = 3, act.fct = "logistic", 
+                    linear.output = FALSE)
+
+
+nn.pca.pred <- compute(nn.pca, validation_data[, 1:13])$net.result
+nn.pca.pred <- ifelse(nn.pca.pred > 0.5, 1, 0)
+
+
+cf.pca <- confusionMatrix(table(nn.pca.pred, validation_data$CLASS_LABEL))
+
+nn_pca_accuracy <- 100 * cf.pca$overall[[1]]
+
+cat("Accuracy of Neural Network (PCA):", paste0(nn_pca_accuracy, "%"), "\n")
+
+performance_list[dim(performance_list)[[1]] + 1, ] <- c("Neural Network (PCA)", nn_pca_accuracy)
+
+rm(list = c("nn.pca", "nn.pca.pred", "cf.pca", "nn_pca_accuracy"))
 ##############################################################
+
