@@ -7,13 +7,16 @@ library(ISLR)
 library(tree)
 library(randomForest)
 library(neuralnet)
+library(ROCR)
 library(e1071)
+library(gains)
 library(ggplot2)
 
 # Load phishing_websites.csv
 df <- data.frame(read.csv("./data/phishing_websites.csv"))
 # Remove "HttpsInHostname" column
 df <- df[, !colnames(df) %in% c("HttpsInHostname")]
+df$CLASS_LABEL <- as.factor(df$CLASS_LABEL)
 ##############################################################
 ## Data Visualization
 
@@ -72,6 +75,9 @@ indices <- sample(seq_len(nrow(pc)), size = floor(0.6 * nrow(pc)))
 train_data <- pc[indices, ]
 validation_data <- pc[-indices, ]
 
+levels(train_data$CLASS_LABEL) <- make.names(levels(factor(train_data$CLASS_LABEL)))
+levels(validation_data$CLASS_LABEL) <- make.names(levels(factor(validation_data$CLASS_LABEL)))
+
 # Also keep a set of train and validation sets without PCA
 df.norm.train <- as.data.frame(lapply(df.norm[indices, ], as.numeric))
 df.norm.validation <- as.data.frame(lapply(df.norm[-indices, ], as.numeric))
@@ -82,17 +88,36 @@ performance_list <- data.frame("Model" = NA, "Accuracy" = NA)
 #######################
 ## Implementing KNN
 
-k <- as.integer(sqrt(dim(train_data)[[1]])/2 + 1)
+repeats = 3
+numbers = 10
+tunel = 10
 
-knn.pred <- knn(train = train_data[, 1:13], 
-                test = validation_data[, 1:13], 
-                cl = train_data$CLASS_LABEL, 
-                k = k)
+x <- trainControl(method = "repeatedcv",
+                 number = numbers,
+                 repeats = repeats,
+                 classProbs = TRUE,
+                 summaryFunction = twoClassSummary)
 
-knn.pred
-cf <- confusionMatrix(knn.pred, validation_data$CLASS_LABEL)
+knn <- caret::train(CLASS_LABEL ~ ., 
+                data = train_data, 
+                method = "knn",
+                trControl = x,
+                metric = "ROC",
+                tuneLength = tunel)
 
-cf
+# Summary of model
+knn
+plot(knn)
+
+knn.pred <- predict(knn, validation_data, type = "prob")
+predictions <- prediction(knn.pred[, 2], validation_data$CLASS_LABEL)
+validation_roc <- performance(predictions, "tpr", "fpr")
+plot(validation_roc,lwd=2,col='blue',main="ROC Curve")
+abline(a=0, b= 1)
+
+knn.pred.labels <- ifelse(knn.pred[, 1] <= knn.pred[, 2], 1, 0)
+
+
 # Get the K-value with the highest accuracy
 knn_accuracy <- 100 * cf$overall[[1]]
 
@@ -103,6 +128,11 @@ cat(
 
 # Add to performance list
 performance_list[1, ] <- c("KNN (PCA)", knn_accuracy)
+
+predictions <- prediction(predictions = knn.pred, 
+                          labels = validation_data$CLASS_LABEL)
+perf <- performance(predictions, "tpr", "fpr")
+plot(perf, main="ROC curve", colorize=T)
 
 rm(list = c("k", "knn.pred", "knn_accuracy", "cf"))
 
@@ -148,6 +178,8 @@ nb_accuracy <- 100 * cf$overall[[1]]
 cat("Accuracy of Naive Bayes Model:", paste0(nb_accuracy, "%"), "\n")
 
 performance_list[dim(performance_list)[[1]] + 1, ] <- c("Naive Bayes (PCA)", nb_accuracy)
+
+
 
 rm(list = c("nb", "cf", "pred.class", "nb_accuracy"))
 
