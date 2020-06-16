@@ -268,14 +268,24 @@ evaluate_performance(pred.val, validation_data$CLASS_LABEL,
                      "Artificial Neural Net (PCA)")
 
 # On Original Dataset
-nn <- neuralnet(CLASS_LABEL ~ .,
-                data = df.norm.train,
-                hidden = 4,
-                act.fct = "logistic",
-                linear.output = FALSE)
+repeats = 2
+numbers = 2
+tunel = 6
 
-plot(nn)
-nn.pred <- neuralnet::compute(nn, df.norm.validation[, 1:47])$net.result
+x <- trainControl(method = "repeatedcv",
+                  number = numbers,
+                  repeats = repeats,
+                  classProbs = TRUE,
+                  summaryFunction = twoClassSummary)
+
+
+nn <- train(CLASS_LABEL ~ . , data = df.norm.validation, 
+            method = "nnet",
+            trControl = x,
+            metric = "ROC",
+            tuneLength = tunel)
+
+nn.pred <- predict(nn, newdata = df.norm.validation, type = "prob")
 pred.val <- prediction(nn.pred[, 2], df.norm.validation$CLASS_LABEL)
 evaluate_performance(pred.val, df.norm.validation$CLASS_LABEL, 
                      "Artificial Neural Net")
@@ -284,3 +294,4 @@ evaluate_performance(pred.val, df.norm.validation$CLASS_LABEL,
 rm(list = c("nn.pca", "nn.pca.pred", "nn", "pred.val", "nn.pred"))
 ##############################################################
 
+write.csv(performance_list, "performance_list.csv")
