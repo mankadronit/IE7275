@@ -14,7 +14,7 @@ library(ggplot2)
 
 # Load phishing_websites.csv
 df <- data.frame(read.csv("./data/phishing_websites.csv"))
-# Remove "HttpsInHostname" column
+# Remove "HttpsInHostname" column because it contains a few NAs
 df <- df[, !colnames(df) %in% c("HttpsInHostname")]
 df$CLASS_LABEL <- as.factor(df$CLASS_LABEL)
 ##############################################################
@@ -22,16 +22,19 @@ df$CLASS_LABEL <- as.factor(df$CLASS_LABEL)
 
 # Let's look at NumDots Histogram
 ggplot(df, aes(NumDots)) +
-  geom_histogram(binwidth = 1, color = "black", fill = "steelblue")
+  geom_histogram(binwidth = 1, color = "black", fill = "steelblue") +
+  ggtitle("NumDots Histogram")
 
 # Let's look at the UrlLength Histogram
 ggplot(df, aes(UrlLength)) +
-  geom_histogram(binwidth = 25, color = "black", fill = "steelblue")
+  geom_histogram(binwidth = 25, color = "black", fill = "steelblue") +
+  ggtitle("UrlLength Histogram")
 
 # Let's look at whether having an IP address in the Url gives us any information as
 # to whether the website is a phishing website or not
 ggplot(df, aes(as.factor(IpAddress), fill = CLASS_LABEL)) +
-  geom_histogram(stat = "count")
+  geom_histogram(stat = "count") +
+  ggtitle("IpAddress by CLASS_LABEL Barplot")
 
 
 
@@ -45,7 +48,7 @@ normalize <- function(x) {
   return((x - min(x))) / (max(x) - min(x))
 }
 
-# Normalize the dataframe
+# Normalize the data frame
 df.norm <- as.data.frame(cbind(as.data.frame(lapply(df[1:47], normalize)), 
                                df$CLASS_LABEL)) %>%
   rename(CLASS_LABEL = "df$CLASS_LABEL")
@@ -75,19 +78,61 @@ indices <- sample(seq_len(nrow(pc)), size = floor(0.6 * nrow(pc)))
 train_data <- pc[indices, ]
 validation_data <- pc[-indices, ]
 
-levels(train_data$CLASS_LABEL) <- make.names(levels(factor(train_data$CLASS_LABEL)))
-levels(validation_data$CLASS_LABEL) <- make.names(levels(factor(validation_data$CLASS_LABEL)))
+levels(train_data$CLASS_LABEL) <- 
+  make.names(levels(factor(train_data$CLASS_LABEL)))
+levels(validation_data$CLASS_LABEL) <- 
+  make.names(levels(factor(validation_data$CLASS_LABEL)))
 
 # Also keep a set of train and validation sets without PCA
 df.norm.train <- as.data.frame(lapply(df.norm[indices, ], as.numeric))
 df.norm.validation <- as.data.frame(lapply(df.norm[-indices, ], as.numeric))
 
+df.norm.train <- df.norm[indices, ]
+df.norm.validation <- df.norm[-indices, ]
+df.norm.train$CLASS_LABEL <- as.factor(df.norm.train$CLASS_LABEL)
+df.norm.validation$CLASS_LABEL <- as.factor(df.norm.validation$CLASS_LABEL)
+
+levels(df.norm.train$CLASS_LABEL) <- 
+  make.names(levels(factor(df.norm.train$CLASS_LABEL)))
+levels(df.norm.validation$CLASS_LABEL) <- 
+  make.names(levels(factor(df.norm.validation$CLASS_LABEL)))
+
+
+
 # Creating a performance list for each algorithm
-performance_list <- data.frame("Model" = NA, "Accuracy" = NA)
+performance_list <- data.frame("Model" = character(), 
+                               "AUC" = numeric(), 
+                               "Accuracy" = numeric())
+
+# Helper Function to plot ROC Curve and Calculate Accuracy
+
+evaluate_performance <- function(pred, labels, model_name) {
+  # Accuracy
+  pred.class <- ifelse(slot(pred.val, "predictions")[[1]] > 0.5, "X1", "X0")
+  levels(pred.class) <- make.names(levels(factor(pred.class)))
+  
+  acc <- confusionMatrix(table(pred.class, labels))$overall[[1]] * 100
+  
+  # ROC Plot
+  roc <- performance(pred.val, "tpr", "fpr")
+  plot(roc, col = "red", lwd = 2, main = paste0(model_name, " ROC Curve"))
+  abline(a = 0, b = 1)
+  
+  auc <- performance(pred.val, measure = "auc")
+  
+  temp <- data.frame("Model" = model_name, 
+                     "AUC" = auc@y.values[[1]], 
+                     "Accuracy" = acc)
+  performance_list <<- rbind(performance_list, temp)
+  print("Updated Performance List")
+  
+  rm(list = c("auc", "acc", "roc", "pred.class", "temp"))
+}
 
 #######################
 ## Implementing KNN
 
+# Setting up train controls
 repeats = 3
 numbers = 10
 tunel = 10
@@ -98,90 +143,59 @@ x <- trainControl(method = "repeatedcv",
                  classProbs = TRUE,
                  summaryFunction = twoClassSummary)
 
-knn <- caret::train(CLASS_LABEL ~ ., 
-                data = train_data, 
-                method = "knn",
-                trControl = x,
-                metric = "ROC",
-                tuneLength = tunel)
 
-# Summary of model
-knn
-plot(knn)
+knn.model <- train(CLASS_LABEL ~ . , data = train_data, method = "knn",
+                  trControl = x,
+                  metric = "ROC",
+                  tuneLength = tunel)
 
-knn.pred <- predict(knn, validation_data, type = "prob")
-predictions <- prediction(knn.pred[, 2], validation_data$CLASS_LABEL)
-validation_roc <- performance(predictions, "tpr", "fpr")
-plot(validation_roc,lwd=2,col='blue',main="ROC Curve")
-abline(a=0, b= 1)
+# Look at the KNN Model
+knn.model
+plot(knn.model)
 
-knn.pred.labels <- ifelse(knn.pred[, 1] <= knn.pred[, 2], 1, 0)
+# get predictions for validation data
+knn.pred <- predict(knn.model, validation_data, type = "prob")
+pred.val <- prediction(knn.pred[, 2], validation_data$CLASS_LABEL) 
 
 
-# Get the K-value with the highest accuracy
-knn_accuracy <- 100 * cf$overall[[1]]
-
-cat(
-  "The model with K =", k,
-  "has accuracy:", paste0(knn_accuracy, "%"), "\n"
-)
-
-# Add to performance list
-performance_list[1, ] <- c("KNN (PCA)", knn_accuracy)
-
-predictions <- prediction(predictions = knn.pred, 
-                          labels = validation_data$CLASS_LABEL)
-perf <- performance(predictions, "tpr", "fpr")
-plot(perf, main="ROC curve", colorize=T)
-
-rm(list = c("k", "knn.pred", "knn_accuracy", "cf"))
+evaluate_performance(pred.val, validation_data$CLASS_LABEL, "KNN")
+rm(list = c("repeats", "numbers", "tunel", "knn.model", "x", "knn.pred", 
+            "pred.val"))
 
 #######################
 ## Implementing Logistic Regression
+# On PCA Dataset
 glm.fit.pc <- glm(CLASS_LABEL ~ ., data = train_data, family = binomial)
 
-
 glm.probs.pc <- predict(glm.fit.pc, newdata = validation_data, type = "response")
-glm.pred.pc <- ifelse(glm.probs.pc > 0.5, 1, 0)
+pred.val <- prediction(glm.probs.pc, validation_data$CLASS_LABEL) 
 
-cf.pc <- confusionMatrix(table(glm.pred.pc, validation_data$CLASS_LABEL))
+evaluate_performance(pred.val, validation_data$CLASS_LABEL, 
+                     "Logistic Regression (PCA)")
 
-glm.fit <- glm(CLASS_LABEL ~ ., data = df.norm[indices, ], family = binomial)
-
+# On Original Dataset
+glm.fit <- glm(CLASS_LABEL ~ ., data = df.norm.train, family = binomial)
 
 glm.probs <- predict(glm.fit, newdata = df.norm[-indices, ], type = "response")
-glm.pred <- ifelse(glm.probs > 0.5, 1, 0)
+pred.val <- prediction(glm.probs, validation_data$CLASS_LABEL) 
 
-cf <- confusionMatrix(table(glm.pred, df.norm[-indices, ]$CLASS_LABEL))
+evaluate_performance(pred.val, validation_data$CLASS_LABEL, 
+                     "Logistic Regression")
 
-logistic_accuracy.pc <- 100 * cf.pc$overall[1]
-logistic_accuracy <- 100 * cf$overall[1]
-cat("Accuracy of Logistic Regression Model with PCA:", paste0(logistic_accuracy.pc, "%"), "\n")
-cat("Accuracy of Logistic Regression Model:", paste0(logistic_accuracy, "%"), "\n")
-
-
-performance_list[dim(performance_list)[[1]] + 1, ] <- c("Logistic Regression (PCA)", logistic_accuracy.pc)
-performance_list[dim(performance_list)[[1]] + 1, ] <- c("Logistic Regression", logistic_accuracy)
-
-rm(list = c("glm.fit", "glm.pred", "glm.probs", "logistic_accuracy", "cf",
-            "glm.fit.pc", "glm.pred.pc", "glm.probs.pc", "logistic_accuracy.pc", "cf.pc"))
+rm(list = c("glm.fit", "glm.probs",
+            "glm.fit.pc", "glm.probs.pc", 
+            "pred.val"))
 
 #######################
 ## Implementing Naive Bayes
 nb <- naiveBayes(CLASS_LABEL ~ ., data = train_data)
 
-pred.class <- predict(nb, newdata = validation_data)
+nb.pred <- predict(nb, newdata = validation_data, type = "raw")
+pred.val <- prediction(nb.pred[, 2], validation_data$CLASS_LABEL) 
 
-cf <- confusionMatrix(table(pred.class, validation_data$CLASS_LABEL))
+evaluate_performance(pred.val, validation_data$CLASS_LABEL, "Naive Bayes (PCA)")
 
-nb_accuracy <- 100 * cf$overall[[1]]
-cat("Accuracy of Naive Bayes Model:", paste0(nb_accuracy, "%"), "\n")
-
-performance_list[dim(performance_list)[[1]] + 1, ] <- c("Naive Bayes (PCA)", nb_accuracy)
-
-
-
-rm(list = c("nb", "cf", "pred.class", "nb_accuracy"))
+rm(list = c("nb", "nb.pred", "pred.val"))
 
 #######################
 ## Implementing Decision Tree
@@ -190,76 +204,83 @@ tree.pca <- tree(CLASS_LABEL ~ ., data = train_data)
 plot(tree.pca)
 text(tree.pca, pretty = 0)
 
-tree.pca.pred <- predict(tree.pca, validation_data, type = "class")
-cf.pca <- confusionMatrix(tree.pca.pred, validation_data$CLASS_LABEL)
+tree.pca.pred <- predict(tree.pca, validation_data)
+pred.val <- prediction(tree.pca.pred[, 2], validation_data$CLASS_LABEL) 
+
+
+evaluate_performance(pred.val, 
+                     validation_data$CLASS_LABEL, 
+                     "Classification Tree (PCA)")
 
 # Classification tree on Original Dataset
 tree <- tree(CLASS_LABEL ~ ., data = df.norm[indices, ])
 plot(tree)
 text(tree, pretty = 0)
 
-tree.pred <- predict(tree, df.norm[-indices, ], type = "class")
-cf <- confusionMatrix(tree.pred, df.norm[-indices, ]$CLASS_LABEL)
+tree.pred <- predict(tree, df.norm[-indices, ])
+pred.val <- prediction(tree.pred[, 2], validation_data$CLASS_LABEL)
 
-tree_pca_accuracy <- 100 * cf.pc$overall[[1]]
-tree_accuracy <- 100 * cf$overall[[1]]
+evaluate_performance(pred.val, 
+                     validation_data$CLASS_LABEL, 
+                     "Classification Tree")
 
-cat("Accuracy of Decision Tree (PCA):", paste0(tree_pca_accuracy, "%"), "\n")
-cat("Accuracy of Decision Tree:", paste0(tree_accuracy, "%"), "\n")
-
-performance_list[dim(performance_list)[[1]] + 1, ] <- c("Decision Tree (PCA)", tree_pca_accuracy)
-performance_list[dim(performance_list)[[1]] + 1, ] <- c("Decision Tree", tree_accuracy)
-
-rm(list = c("tree.pca", "tree.pca.pred", "cf.pca", "tree", 
-            "tree.pred", "cf", "tree_pca_accuracy", "tree_accuracy"))
+rm(list = c("tree.pca", "tree.pca.pred", "tree", 
+            "tree.pred", "pred.val"))
 
 #######################
 ## Implementing Random Forests
 
 # On PCA dataset
 rf.pca <- randomForest(CLASS_LABEL ~ ., data = train_data)
-rf.pca.pred <- predict(rf.pca, validation_data)
-cf.pca <- confusionMatrix(rf.pca.pred, validation_data$CLASS_LABEL)
+rf.pca.pred <- predict(rf.pca, validation_data, type = "prob")
+pred.val <- prediction(rf.pca.pred[, 2], validation_data$CLASS_LABEL)
 
-
-rf_pca_accuracy <- 100 * cf.pca$overall[[1]]
-
+evaluate_performance(pred.val, 
+                     validation_data$CLASS_LABEL, 
+                     "Random Forest (PCA)")
 # On original dataset
 rf <- randomForest(CLASS_LABEL ~ ., data = df.norm[indices, ])
-rf.pred <- predict(rf, df.norm[-indices, ])
-cf <- confusionMatrix(rf.pred, df.norm[-indices, ]$CLASS_LABEL)
+rf.pred <- predict(rf, df.norm[-indices, ], type = "prob")
+pred.val <- prediction(rf.pred[, 2], validation_data$CLASS_LABEL)
+
+evaluate_performance(pred.val, 
+                     validation_data$CLASS_LABEL, 
+                     "Random Forest")
 
 
-rf_accuracy <- 100 * cf$overall[[1]]
-
-cat("Accuracy of Random Forests (PCA):", paste0(rf_pca_accuracy, "%"), "\n")
-cat("Accuracy of Random Forests:", paste0(rf_accuracy, "%"), "\n")
-
-performance_list[dim(performance_list)[[1]] + 1, ] <- c("Random Forests (PCA)", rf_pca_accuracy)
-performance_list[dim(performance_list)[[1]] + 1, ] <- c("Random Forests", rf_accuracy)
-
-rm(list = c("rf.pca", "rf.pca.pred", "cf.pca", "rf", 
-            "rf.pred", "cf", "rf_accuracy", "rf_pca_accuracy"))
+rm(list = c("rf.pca", "rf.pca.pred", "rf", 
+            "rf.pred", "pred.val"))
 
 #######################
 ## Implementing Artificial Neural Networks
 # On PCA Dataset
-nn.pca <- neuralnet(CLASS_LABEL ~ ., data = train_data, hidden = 3, act.fct = "logistic", 
+nn.pca <- neuralnet(CLASS_LABEL ~ ., 
+                    data = train_data, 
+                    hidden = 3, 
+                    act.fct = "logistic", 
                     linear.output = FALSE)
 
+plot(nn.pca)
 
-nn.pca.pred <- compute(nn.pca, validation_data[, 1:13])$net.result
-nn.pca.pred <- ifelse(nn.pca.pred > 0.5, 1, 0)
+nn.pca.pred <- neuralnet::compute(nn.pca, validation_data[, 1:13])$net.result
+pred.val <- prediction(nn.pca.pred[, 2], validation_data$CLASS_LABEL)
+evaluate_performance(pred.val, validation_data$CLASS_LABEL, 
+                     "Artificial Neural Net (PCA)")
+
+# On Original Dataset
+nn <- neuralnet(CLASS_LABEL ~ .,
+                data = df.norm.train,
+                hidden = 4,
+                act.fct = "logistic",
+                linear.output = FALSE)
+
+plot(nn)
+nn.pred <- neuralnet::compute(nn, df.norm.validation[, 1:47])$net.result
+pred.val <- prediction(nn.pred[, 2], df.norm.validation$CLASS_LABEL)
+evaluate_performance(pred.val, df.norm.validation$CLASS_LABEL, 
+                     "Artificial Neural Net")
 
 
-cf.pca <- confusionMatrix(table(nn.pca.pred, validation_data$CLASS_LABEL))
-
-nn_pca_accuracy <- 100 * cf.pca$overall[[1]]
-
-cat("Accuracy of Neural Network (PCA):", paste0(nn_pca_accuracy, "%"), "\n")
-
-performance_list[dim(performance_list)[[1]] + 1, ] <- c("Neural Network (PCA)", nn_pca_accuracy)
-
-rm(list = c("nn.pca", "nn.pca.pred", "cf.pca", "nn_pca_accuracy"))
+rm(list = c("nn.pca", "nn.pca.pred", "nn", "pred.val", "nn.pred"))
 ##############################################################
 
