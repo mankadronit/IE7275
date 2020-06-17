@@ -108,7 +108,7 @@ performance_list <- data.frame("Model" = character(),
 
 evaluate_performance <- function(pred, labels, model_name) {
   # Accuracy
-  pred.class <- ifelse(slot(pred.val, "predictions")[[1]] > 0.5, "X1", "X0")
+  pred.class <- ifelse(slot(pred, "predictions")[[1]] > 0.5, "X1", "X0")
   levels(pred.class) <- make.names(levels(factor(pred.class)))
   
   acc <- confusionMatrix(table(pred.class, labels))$overall[[1]] * 100
@@ -118,6 +118,7 @@ evaluate_performance <- function(pred, labels, model_name) {
   plot(roc, col = "red", lwd = 2, main = paste0(model_name, " ROC Curve"))
   abline(a = 0, b = 1)
   
+  
   auc <- performance(pred.val, measure = "auc")
   
   temp <- data.frame("Model" = model_name, 
@@ -126,7 +127,12 @@ evaluate_performance <- function(pred, labels, model_name) {
   performance_list <<- rbind(performance_list, temp)
   print("Updated Performance List")
   
-  rm(list = c("auc", "acc", "roc", "pred.class", "temp"))
+  lift <- performance(pred.val, "tpr", "rpp")
+  plot(lift, main = paste0(model_name, " Lift Curve"), col = "red")
+  abline(a = 0, b = 1)
+  
+  
+  rm(list = c("auc", "acc", "roc", "pred.class", "temp", "lift"))
 }
 
 #######################
@@ -161,6 +167,7 @@ pred.val <- prediction(knn.pred[, 2], validation_data$CLASS_LABEL)
 evaluate_performance(pred.val, validation_data$CLASS_LABEL, "KNN")
 rm(list = c("repeats", "numbers", "tunel", "knn.model", "x", "knn.pred", 
             "pred.val"))
+
 
 #######################
 ## Implementing Logistic Regression
@@ -291,7 +298,8 @@ evaluate_performance(pred.val, df.norm.validation$CLASS_LABEL,
                      "Artificial Neural Net")
 
 
-rm(list = c("nn.pca", "nn.pca.pred", "nn", "pred.val", "nn.pred"))
+rm(list = c("nn.pca", "nn.pca.pred", "nn", "pred.val", "nn.pred",
+            "repeats", "numbers", "tunel"))
 ##############################################################
 
 write.csv(performance_list, "performance_list.csv")
