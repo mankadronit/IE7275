@@ -11,12 +11,18 @@ library(ROCR)
 library(e1071)
 library(gains)
 library(ggplot2)
+library(reshape2)
+library(rpart)
+library(rpart.plot)
+library(corrplot)
 
 # Load phishing_websites.csv
 df <- data.frame(read.csv("./data/phishing_websites.csv"))
 # Remove "HttpsInHostname" column because it contains a few NAs
-df <- df[, !colnames(df) %in% c("HttpsInHostname")]
-df$CLASS_LABEL <- as.factor(df$CLASS_LABEL)
+df$PHISHING_WEBSITE <- as.factor(ifelse(df$CLASS_LABEL == 1, "Yes", "No"))
+df <- df[, !colnames(df) %in% c("HttpsInHostname", "CLASS_LABEL")]
+
+describe(df)
 ##############################################################
 ## Data Visualization
 
@@ -32,12 +38,15 @@ ggplot(df, aes(UrlLength)) +
 
 # Let's look at whether having an IP address in the Url gives us any information as
 # to whether the website is a phishing website or not
-ggplot(df, aes(as.factor(IpAddress), fill = CLASS_LABEL)) +
+ggplot(df, aes(as.factor(IpAddress), fill = PHISHING_WEBSITE)) +
   geom_histogram(stat = "count") +
-  ggtitle("IpAddress by CLASS_LABEL Barplot")
+  ggtitle("IpAddress Barplot") +
+  labs(x = "IP Address")
 
+# corrplot
 
-
+cor <- round(cor(df[, 1:47]), 2)
+corrplot(cor, type = "upper")
 ## Looks like all sites having an IP Address in the Url are phishing websites.
 
 ##############################################################
@@ -49,9 +58,11 @@ normalize <- function(x) {
 }
 
 # Normalize the data frame
-df.norm <- as.data.frame(cbind(as.data.frame(lapply(df[1:47], normalize)), 
-                               df$CLASS_LABEL)) %>%
-  rename(CLASS_LABEL = "df$CLASS_LABEL")
+df.norm <- as.data.frame(cbind(
+  as.data.frame(lapply(df[1:47], normalize)),
+  df$PHISHING_WEBSITE
+)) %>%
+  rename(PHISHING_WEBSITE = "df$PHISHING_WEBSITE")
 
 
 ##############################################################
@@ -64,8 +75,8 @@ fa.parallel(df.norm[, 1:47], fa = "pc", n.iter = 100, show.legend = FALSE)
 
 # Perform PCA with 13 components
 pc <- principal(df.norm[, 1:47], nfactors = 13, rotate = "none", scores = TRUE)
-pc <- cbind(as.data.frame(pc$scores), df.norm$CLASS_LABEL) %>%
-  rename(CLASS_LABEL = "df.norm$CLASS_LABEL")
+pc <- cbind(as.data.frame(pc$scores), df.norm$PHISHING_WEBSITE) %>%
+  rename(PHISHING_WEBSITE = "df.norm$PHISHING_WEBSITE")
 
 ##############################################################
 ## Data Mining Techniques
@@ -78,10 +89,14 @@ indices <- sample(seq_len(nrow(pc)), size = floor(0.6 * nrow(pc)))
 train_data <- pc[indices, ]
 validation_data <- pc[-indices, ]
 
-levels(train_data$CLASS_LABEL) <- 
-  make.names(levels(factor(train_data$CLASS_LABEL)))
-levels(validation_data$CLASS_LABEL) <- 
-  make.names(levels(factor(validation_data$CLASS_LABEL)))
+levels(train_data$PHISHING_WEBSITE) <-
+  make.names(levels(factor(train_data$PHISHING_WEBSITE)))
+levels(validation_data$PHISHING_WEBSITE) <-
+  make.names(levels(factor(validation_data$PHISHING_WEBSITE)))
+
+# corrplot of pca data
+cor <- cor(pc[, 1:13])
+corrplot(cor, type = "upper")
 
 # Also keep a set of train and validation sets without PCA
 df.norm.train <- as.data.frame(lapply(df.norm[indices, ], as.numeric))
@@ -89,71 +104,86 @@ df.norm.validation <- as.data.frame(lapply(df.norm[-indices, ], as.numeric))
 
 df.norm.train <- df.norm[indices, ]
 df.norm.validation <- df.norm[-indices, ]
-df.norm.train$CLASS_LABEL <- as.factor(df.norm.train$CLASS_LABEL)
-df.norm.validation$CLASS_LABEL <- as.factor(df.norm.validation$CLASS_LABEL)
+df.norm.train$PHISHING_WEBSITE <- as.factor(df.norm.train$PHISHING_WEBSITE)
+df.norm.validation$PHISHING_WEBSITE <- as.factor(df.norm.validation$PHISHING_WEBSITE)
 
-levels(df.norm.train$CLASS_LABEL) <- 
-  make.names(levels(factor(df.norm.train$CLASS_LABEL)))
-levels(df.norm.validation$CLASS_LABEL) <- 
-  make.names(levels(factor(df.norm.validation$CLASS_LABEL)))
+levels(df.norm.train$PHISHING_WEBSITE) <-
+  make.names(levels(factor(df.norm.train$PHISHING_WEBSITE)))
+levels(df.norm.validation$PHISHING_WEBSITE) <-
+  make.names(levels(factor(df.norm.validation$PHISHING_WEBSITE)))
 
 
 
 # Creating a performance list for each algorithm
-performance_list <- data.frame("Model" = character(), 
-                               "AUC" = numeric(), 
-                               "Accuracy" = numeric())
+performance_list <- data.frame(
+  "Model" = character(),
+  "AUC" = numeric(),
+  "Accuracy" = numeric()
+)
+
+model_names <- list()
+lift_charts <- list()
+roc_curves <- list()
 
 # Helper Function to plot ROC Curve and Calculate Accuracy
 
 evaluate_performance <- function(pred, labels, model_name) {
+  model_names[[length(model_names) + 1]] <<- model_name
+  
   # Accuracy
-  pred.class <- ifelse(slot(pred, "predictions")[[1]] > 0.5, "X1", "X0")
+  pred.class <- ifelse(slot(pred, "predictions")[[1]] > 0.5, "Yes", "No")
   levels(pred.class) <- make.names(levels(factor(pred.class)))
-  
+
   acc <- confusionMatrix(table(pred.class, labels))$overall[[1]] * 100
-  
+
   # ROC Plot
-  roc <- performance(pred.val, "tpr", "fpr")
+  roc <- performance(pred, "tpr", "fpr")
   plot(roc, col = "red", lwd = 2, main = paste0(model_name, " ROC Curve"))
   abline(a = 0, b = 1)
   
-  
-  auc <- performance(pred.val, measure = "auc")
-  
-  temp <- data.frame("Model" = model_name, 
-                     "AUC" = auc@y.values[[1]], 
-                     "Accuracy" = acc)
+  roc_curves[[length(roc_curves) + 1]] <<- roc
+
+
+  auc <- performance(pred, measure = "auc")
+
+  temp <- data.frame(
+    "Model" = model_name,
+    "AUC" = auc@y.values[[1]],
+    "Accuracy" = acc
+  )
   performance_list <<- rbind(performance_list, temp)
   print("Updated Performance List")
-  
-  lift <- performance(pred.val, "tpr", "rpp")
-  plot(lift, main = paste0(model_name, " Lift Curve"), col = "red")
+
+  lift <- performance(pred, "tpr", "rpp")
+  plot(lift, main = paste0(model_name, " Lift Curve"), col = "green")
   abline(a = 0, b = 1)
-  
-  
+
+  lift_charts[[length(lift_charts) + 1]] <<- lift
+
   rm(list = c("auc", "acc", "roc", "pred.class", "temp", "lift"))
 }
+
 
 #######################
 ## Implementing KNN
 
 # Setting up train controls
-repeats = 3
-numbers = 10
-tunel = 10
-
-x <- trainControl(method = "repeatedcv",
-                 number = numbers,
-                 repeats = repeats,
-                 classProbs = TRUE,
-                 summaryFunction = twoClassSummary)
+tc <- trainControl(
+  method = "repeatedcv",
+  number = 10,
+  repeats = 3,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
 
 
-knn.model <- train(CLASS_LABEL ~ . , data = train_data, method = "knn",
-                  trControl = x,
-                  metric = "ROC",
-                  tuneLength = tunel)
+set.seed(20)
+knn.model <- train(PHISHING_WEBSITE ~ .,
+  data = train_data, method = "knn",
+  trControl = tc,
+  metric = "ROC",
+  tuneLength = 10
+)
 
 # Look at the KNN Model
 knn.model
@@ -161,145 +191,223 @@ plot(knn.model)
 
 # get predictions for validation data
 knn.pred <- predict(knn.model, validation_data, type = "prob")
-pred.val <- prediction(knn.pred[, 2], validation_data$CLASS_LABEL) 
+pred.val <- prediction(knn.pred[, 2], validation_data$PHISHING_WEBSITE)
 
 
-evaluate_performance(pred.val, validation_data$CLASS_LABEL, "KNN")
-rm(list = c("repeats", "numbers", "tunel", "knn.model", "x", "knn.pred", 
-            "pred.val"))
+evaluate_performance(pred.val, validation_data$PHISHING_WEBSITE, "KNN")
+
+rm(list = c("knn.model", "tc", "knn.pred", "pred.val"))
 
 
 #######################
 ## Implementing Logistic Regression
 # On PCA Dataset
-glm.fit.pc <- glm(CLASS_LABEL ~ ., data = train_data, family = binomial)
+set.seed(20)
+glm.fit.pc <- glm(PHISHING_WEBSITE ~ ., data = train_data, family = binomial)
 
 glm.probs.pc <- predict(glm.fit.pc, newdata = validation_data, type = "response")
-pred.val <- prediction(glm.probs.pc, validation_data$CLASS_LABEL) 
+pred.val <- prediction(glm.probs.pc, validation_data$PHISHING_WEBSITE)
 
-evaluate_performance(pred.val, validation_data$CLASS_LABEL, 
-                     "Logistic Regression (PCA)")
+evaluate_performance(
+  pred.val, validation_data$PHISHING_WEBSITE,
+  "Logistic Regression (PCA)"
+)
+
 
 # On Original Dataset
-glm.fit <- glm(CLASS_LABEL ~ ., data = df.norm.train, family = binomial)
+set.seed(20)
+glm.fit <- glm(PHISHING_WEBSITE ~ ., data = df.norm.train, family = binomial)
 
-glm.probs <- predict(glm.fit, newdata = df.norm[-indices, ], type = "response")
-pred.val <- prediction(glm.probs, validation_data$CLASS_LABEL) 
+glm.probs <- predict(glm.fit, newdata = df.norm.validation, type = "response")
+pred.val <- prediction(glm.probs, df.norm.validation$PHISHING_WEBSITE)
 
-evaluate_performance(pred.val, validation_data$CLASS_LABEL, 
-                     "Logistic Regression")
+evaluate_performance(
+  pred.val, validation_data$PHISHING_WEBSITE,
+  "Logistic Regression"
+)
 
-rm(list = c("glm.fit", "glm.probs",
-            "glm.fit.pc", "glm.probs.pc", 
-            "pred.val"))
+rm(list = c(
+  "glm.fit", "glm.probs",
+  "glm.fit.pc", "glm.probs.pc",
+  "pred.val"
+))
 
 #######################
 ## Implementing Naive Bayes
-nb <- naiveBayes(CLASS_LABEL ~ ., data = train_data)
+set.seed(20)
+nb <- naiveBayes(PHISHING_WEBSITE ~ ., data = train_data)
 
 nb.pred <- predict(nb, newdata = validation_data, type = "raw")
-pred.val <- prediction(nb.pred[, 2], validation_data$CLASS_LABEL) 
+pred.val <- prediction(nb.pred[, 2], validation_data$PHISHING_WEBSITE)
 
-evaluate_performance(pred.val, validation_data$CLASS_LABEL, "Naive Bayes (PCA)")
+evaluate_performance(pred.val, validation_data$PHISHING_WEBSITE, "Naive Bayes (PCA)")
 
 rm(list = c("nb", "nb.pred", "pred.val"))
 
 #######################
 ## Implementing Decision Tree
 # Classification tree on PCA Dataset
-tree.pca <- tree(CLASS_LABEL ~ ., data = train_data)
-plot(tree.pca)
-text(tree.pca, pretty = 0)
 
+set.seed(20)
+tree.pca <- rpart(PHISHING_WEBSITE ~ ., data = train_data, method = "class")
+rpart.plot(tree.pca, main = "Classification Tree (PCA)")
 tree.pca.pred <- predict(tree.pca, validation_data)
-pred.val <- prediction(tree.pca.pred[, 2], validation_data$CLASS_LABEL) 
+pred.val <- prediction(tree.pca.pred[, 2], validation_data$PHISHING_WEBSITE)
 
 
-evaluate_performance(pred.val, 
-                     validation_data$CLASS_LABEL, 
-                     "Classification Tree (PCA)")
+evaluate_performance(
+  pred.val,
+  validation_data$PHISHING_WEBSITE,
+  "Classification Tree (PCA)"
+)
 
 # Classification tree on Original Dataset
-tree <- tree(CLASS_LABEL ~ ., data = df.norm[indices, ])
-plot(tree)
-text(tree, pretty = 0)
+set.seed(20)
+tree <- rpart(PHISHING_WEBSITE ~ ., data = df.norm.train, method = "class")
+rpart.plot(tree, main = "Classification Tree")
 
-tree.pred <- predict(tree, df.norm[-indices, ])
-pred.val <- prediction(tree.pred[, 2], validation_data$CLASS_LABEL)
+print(tree$variable.importance)
 
-evaluate_performance(pred.val, 
-                     validation_data$CLASS_LABEL, 
-                     "Classification Tree")
+tree.pred <- predict(tree, df.norm.validation)
+pred.val <- prediction(tree.pred[, 2], df.norm.validation$PHISHING_WEBSITE)
 
-rm(list = c("tree.pca", "tree.pca.pred", "tree", 
-            "tree.pred", "pred.val"))
+evaluate_performance(
+  pred.val,
+  validation_data$PHISHING_WEBSITE,
+  "Classification Tree"
+)
+
+rm(list = c(
+  "tree.pca", "tree.pca.pred", "tree",
+  "tree.pred", "pred.val"
+))
 
 #######################
 ## Implementing Random Forests
 
 # On PCA dataset
-rf.pca <- randomForest(CLASS_LABEL ~ ., data = train_data)
+set.seed(20)
+rf.pca <- randomForest(PHISHING_WEBSITE ~ ., data = train_data)
 rf.pca.pred <- predict(rf.pca, validation_data, type = "prob")
-pred.val <- prediction(rf.pca.pred[, 2], validation_data$CLASS_LABEL)
+pred.val <- prediction(rf.pca.pred[, 2], validation_data$PHISHING_WEBSITE)
 
-evaluate_performance(pred.val, 
-                     validation_data$CLASS_LABEL, 
-                     "Random Forest (PCA)")
+evaluate_performance(
+  pred.val,
+  validation_data$PHISHING_WEBSITE,
+  "Random Forest (PCA)"
+)
 # On original dataset
-rf <- randomForest(CLASS_LABEL ~ ., data = df.norm[indices, ])
-rf.pred <- predict(rf, df.norm[-indices, ], type = "prob")
-pred.val <- prediction(rf.pred[, 2], validation_data$CLASS_LABEL)
+set.seed(20)
+rf <- randomForest(PHISHING_WEBSITE ~ ., data = df.norm.train)
+rf.pred <- predict(rf, df.norm.validation, type = "prob")
+pred.val <- prediction(rf.pred[, 2], df.norm.validation$PHISHING_WEBSITE)
 
-evaluate_performance(pred.val, 
-                     validation_data$CLASS_LABEL, 
-                     "Random Forest")
+evaluate_performance(
+  pred.val,
+  df.norm.validation$PHISHING_WEBSITE,
+  "Random Forest"
+)
 
 
-rm(list = c("rf.pca", "rf.pca.pred", "rf", 
-            "rf.pred", "pred.val"))
+rm(list = c(
+  "rf.pca", "rf.pca.pred", "rf",
+  "rf.pred", "pred.val"
+))
 
+#######################
+## Implementing Support Vector Machine
+tc <- trainControl(
+  method = "repeatedcv",
+  number = 5,
+  repeats = 3,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
+
+set.seed(20)
+svm.pca <- train(PHISHING_WEBSITE ~ ., train_data,
+  method = "svmLinear",
+  trControl = tc, tuneLength = 10
+)
+
+svm.pca.pred <- predict(svm.pca, validation_data, type = "prob")
+
+pred.val <- prediction(svm.pca.pred[, 2], validation_data$PHISHING_WEBSITE)
+
+evaluate_performance(
+  pred.val,
+  validation_data$PHISHING_WEBSITE,
+  "SVM (PCA)"
+)
+
+# On Original Dataset
+tc <- trainControl(
+  method = "repeatedcv",
+  number = 5,
+  repeats = 3,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
+
+set.seed(20)
+svm <- train(PHISHING_WEBSITE ~ .,
+  df.norm.train,
+  method = "svmLinear",
+  preProcess = NULL,
+  trControl = tc,
+  metric = "ROC",
+  tuneLength = 10
+)
+
+svm.pred <- predict(svm, df.norm.validation, type = "prob")
+
+pred.val <- prediction(svm.pred[, 2], df.norm.validation$PHISHING_WEBSITE)
+
+evaluate_performance(
+  pred.val,
+  validation_data$PHISHING_WEBSITE,
+  "SVM"
+)
+
+rm(list = c("tc", "svm.pca", "svm", "svm.pred", "svm.pca.pred", "pred.val"))
 #######################
 ## Implementing Artificial Neural Networks
 # On PCA Dataset
-nn.pca <- neuralnet(CLASS_LABEL ~ ., 
-                    data = train_data, 
-                    hidden = 3, 
-                    act.fct = "logistic", 
-                    linear.output = FALSE)
+set.seed(20)
+nn.pca <- neuralnet(PHISHING_WEBSITE ~ .,
+  data = train_data,
+  hidden = 3,
+  act.fct = "logistic",
+  linear.output = FALSE
+)
 
-plot(nn.pca)
+plot(nn.pca, main = "Artificial Neural Net (PCA)")
 
 nn.pca.pred <- neuralnet::compute(nn.pca, validation_data[, 1:13])$net.result
-pred.val <- prediction(nn.pca.pred[, 2], validation_data$CLASS_LABEL)
-evaluate_performance(pred.val, validation_data$CLASS_LABEL, 
-                     "Artificial Neural Net (PCA)")
+pred.val <- prediction(nn.pca.pred[, 2], validation_data$PHISHING_WEBSITE)
+evaluate_performance(
+  pred.val, validation_data$PHISHING_WEBSITE,
+  "Artificial Neural Net (PCA)"
+)
 
-# On Original Dataset
-repeats = 2
-numbers = 2
-tunel = 6
-
-x <- trainControl(method = "repeatedcv",
-                  number = numbers,
-                  repeats = repeats,
-                  classProbs = TRUE,
-                  summaryFunction = twoClassSummary)
-
-
-nn <- train(CLASS_LABEL ~ . , data = df.norm.validation, 
-            method = "nnet",
-            trControl = x,
-            metric = "ROC",
-            tuneLength = tunel)
-
-nn.pred <- predict(nn, newdata = df.norm.validation, type = "prob")
-pred.val <- prediction(nn.pred[, 2], df.norm.validation$CLASS_LABEL)
-evaluate_performance(pred.val, df.norm.validation$CLASS_LABEL, 
-                     "Artificial Neural Net")
-
-
-rm(list = c("nn.pca", "nn.pca.pred", "nn", "pred.val", "nn.pred",
-            "repeats", "numbers", "tunel"))
+rm(list = c("nn.pca", "nn.pca.pred", "pred.val"))
 ##############################################################
 
 write.csv(performance_list, "performance_list.csv")
+
+# Plot all ROC Curves
+par(mfrow = c(3, 4))
+for(i in 1:length(roc_curves)) {
+  plot(roc_curves[[i]], main = model_names[[i]], col = "red")
+  abline(a = 0, b = 1)
+}
+
+
+# Plot all lift charts
+par(mfrow = c(3, 4))
+for(i in 1:length(lift_charts)) {
+  plot(lift_charts[[i]], main = model_names[[i]], col = "green")
+  abline(a = 0, b = 1)
+}
+
+
